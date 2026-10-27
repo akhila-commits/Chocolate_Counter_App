@@ -400,6 +400,7 @@ private fun DrawScope.drawChocolateCube(baseColor: Color, w: Float, h: Float) {
 fun RevelloBrandBanner(
     title: String = "REVELLO ORDER CALCULATOR",
     subtitle: String = "Speciality Outlet • Counter POS & Order Tally",
+    showPoweredBy: Boolean = true,
     modifier: Modifier = Modifier
 ) {
     Surface(
@@ -410,7 +411,7 @@ fun RevelloBrandBanner(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 10.dp),
+                .padding(horizontal = 16.dp, vertical = 8.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Row(
@@ -420,14 +421,14 @@ fun RevelloBrandBanner(
                     imageVector = Icons.Default.Star,
                     contentDescription = null,
                     tint = GoldPrimary,
-                    modifier = Modifier.size(15.dp)
+                    modifier = Modifier.size(14.dp)
                 )
                 Spacer(modifier = Modifier.width(6.dp))
                 Text(
                     text = title,
                     fontFamily = PlayfairFontFamily,
                     fontWeight = FontWeight.Bold,
-                    fontSize = 16.sp,
+                    fontSize = 15.sp,
                     letterSpacing = 1.1.sp,
                     color = GoldLight
                 )
@@ -436,7 +437,7 @@ fun RevelloBrandBanner(
                     imageVector = Icons.Default.Star,
                     contentDescription = null,
                     tint = GoldPrimary,
-                    modifier = Modifier.size(15.dp)
+                    modifier = Modifier.size(14.dp)
                 )
             }
             Text(
@@ -446,6 +447,10 @@ fun RevelloBrandBanner(
                 fontSize = 11.sp,
                 letterSpacing = 0.3.sp
             )
+            if (showPoweredBy) {
+                Spacer(modifier = Modifier.height(6.dp))
+                PoweredByMarkTechBadge(compact = true)
+            }
         }
     }
 }

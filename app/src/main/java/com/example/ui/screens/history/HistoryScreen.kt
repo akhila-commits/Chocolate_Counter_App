@@ -69,6 +69,7 @@ import coil.request.ImageRequest
 import com.example.data.model.ScanItem
 import com.example.data.model.ScanRecord
 import com.example.ui.components.ChocolateShapeBadge
+import com.example.ui.components.PoweredByMarkTechFooter
 import com.example.ui.components.RevelloBrandBanner
 import com.example.ui.theme.CacaoBlack
 import com.example.ui.theme.CacaoBorder
@@ -224,6 +225,14 @@ fun HistoryScreen(
                     )
                 }
             }
+
+            item {
+                PoweredByMarkTechFooter(
+                    showTagline = true,
+                    compact = true,
+                    modifier = Modifier.padding(vertical = 12.dp)
+                )
+            }
         }
     }
 
@@ -328,6 +337,13 @@ fun HistoryScreen(
                                 Text("Grand Total:", color = GoldLight, fontWeight = FontWeight.Bold, fontSize = 15.sp)
                                 Text(formatLKR(scan.totalAmount), color = GoldPrimary, fontWeight = FontWeight.Bold, fontSize = 18.sp)
                             }
+
+                            Spacer(modifier = Modifier.height(10.dp))
+                            PoweredByMarkTechFooter(
+                                showTagline = false,
+                                compact = true,
+                                modifier = Modifier.fillMaxWidth()
+                            )
                         }
                     }
                 }

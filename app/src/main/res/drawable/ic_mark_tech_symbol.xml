@@ -1,0 +1,48 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="48dp"
+    android:height="48dp"
+    android:viewportWidth="96"
+    android:viewportHeight="96">
+
+    <!-- Dark rounded container background (MarkTech Navy) -->
+    <path
+        android:fillColor="#0B1F44"
+        android:pathData="M 12,4 L 84,4 A 8,8 0 0,1 92,12 L 92,84 A 8,8 0 0,1 84,92 L 12,92 A 8,8 0 0,1 4,84 L 4,12 A 8,8 0 0,1 12,4 Z" />
+
+    <!-- Subtle container border -->
+    <path
+        android:strokeColor="#1E3A8A"
+        android:strokeWidth="1.5"
+        android:pathData="M 12,4 L 84,4 A 8,8 0 0,1 92,12 L 92,84 A 8,8 0 0,1 84,92 L 12,92 A 8,8 0 0,1 4,84 L 4,12 A 8,8 0 0,1 12,4 Z" />
+
+    <!-- 'M' Monogram (White, crisp geometric facets) -->
+    <!-- Left vertical bar of M -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M 16,36 L 29,28 L 29,74 L 16,74 Z" />
+
+    <!-- Center downward facet of M -->
+    <path
+        android:fillColor="#E2E8F0"
+        android:pathData="M 29,28 L 44,48 L 44,60 L 29,40 Z" />
+
+    <!-- Center right column of M -->
+    <path
+        android:fillColor="#F8FAFC"
+        android:pathData="M 44,48 L 56,33 L 56,74 L 44,74 Z" />
+
+    <!-- 'T' Monogram (Electric Blue overlapping dynamic slant) -->
+    <!-- Slanted top crossbar of T -->
+    <path
+        android:fillColor="#38BDF8"
+        android:pathData="M 36,36 L 68,18 L 82,18 L 46,39 Z" />
+
+    <path
+        android:fillColor="#2563EB"
+        android:pathData="M 46,39 L 82,18 L 82,30 L 52,48 Z" />
+
+    <!-- Vertical stem of T -->
+    <path
+        android:fillColor="#1D4ED8"
+        android:pathData="M 64,30 L 78,22 L 78,74 L 64,74 Z" />
+</vector>

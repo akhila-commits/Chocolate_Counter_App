@@ -1,3 +1,6 @@
 <resources>
     <string name="app_name">Revello Counter</string>
+    <string name="powered_by_company">Powered by MARK-TECH</string>
+    <string name="company_name">MARK-TECH</string>
+    <string name="company_tagline">WHERE TECHNOLOGY MEETS GROWTH.</string>
 </resources>

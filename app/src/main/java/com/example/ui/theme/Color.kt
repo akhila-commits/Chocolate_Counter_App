@@ -30,3 +30,11 @@ val PistachioGreenColor = Color(0xFF438A5E)
 val CaramelColor = Color(0xFFC87D32)
 val MochaColor = Color(0xFF3E2723)
 val PassionFruitColor = Color(0xFFE5A910)
+
+// MARK-TECH Brand Identity Palette
+val MarkTechBlue = Color(0xFF2563EB)
+val MarkTechNavy = Color(0xFF0B1F44)
+val MarkTechNavyDark = Color(0xFF051024)
+val MarkTechCyan = Color(0xFF38BDF8)
+val MarkTechGrey = Color(0xFF94A3B8)
+val MarkTechLight = Color(0xFFF1F5F9)

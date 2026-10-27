@@ -87,6 +87,7 @@ import com.example.data.model.PRODUCT_CATEGORIES
 import com.example.data.model.Product
 import com.example.ui.components.CategoryBadge
 import com.example.ui.components.ChocolateThumbnail
+import com.example.ui.components.PoweredByMarkTechFooter
 import com.example.ui.components.RevelloBrandBanner
 import com.example.ui.components.SizeWeightBadge
 import com.example.ui.components.formatLKR
@@ -295,6 +296,14 @@ fun CatalogScreen(
                         onDelete = { productToDelete = product }
                     )
                 }
+            }
+
+            item {
+                PoweredByMarkTechFooter(
+                    showTagline = true,
+                    compact = true,
+                    modifier = Modifier.padding(vertical = 12.dp)
+                )
             }
         }
     }

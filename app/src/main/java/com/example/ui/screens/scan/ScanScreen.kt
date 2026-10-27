@@ -71,6 +71,8 @@ import com.example.data.model.Product
 import com.example.data.model.ScanItem
 import com.example.ui.components.CategoryBadge
 import com.example.ui.components.ChocolateThumbnail
+import com.example.ui.components.PoweredByMarkTechBadge
+import com.example.ui.components.PoweredByMarkTechFooter
 import com.example.ui.components.QuantityStepper
 import com.example.ui.components.RevelloBrandBanner
 import com.example.ui.components.SizeWeightBadge
@@ -247,6 +249,13 @@ fun ScanScreen(
                                     viewModel.decrementCount(item)
                                 }
                             }
+                        )
+                    }
+                    item {
+                        PoweredByMarkTechFooter(
+                            showTagline = true,
+                            compact = true,
+                            modifier = Modifier.padding(vertical = 12.dp)
                         )
                     }
                     item {

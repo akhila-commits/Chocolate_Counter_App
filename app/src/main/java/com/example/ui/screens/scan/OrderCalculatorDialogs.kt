@@ -57,6 +57,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.example.data.model.ScanItem
+import com.example.ui.components.PoweredByMarkTechFooter
 import com.example.ui.components.QuantityStepper
 import com.example.ui.components.SizeWeightBadge
 import com.example.ui.components.formatLKR
@@ -620,6 +621,13 @@ fun OrderReceiptDialog(
                     Spacer(modifier = Modifier.height(6.dp))
                     Text("Note: $notes", color = Color(0xFFBCAAA4), fontSize = 11.sp)
                 }
+
+                HorizontalDivider(modifier = Modifier.padding(top = 10.dp, bottom = 6.dp), color = CacaoBorder)
+                PoweredByMarkTechFooter(
+                    showTagline = true,
+                    compact = false,
+                    modifier = Modifier.padding(top = 2.dp)
+                )
             }
         },
         confirmButton = {

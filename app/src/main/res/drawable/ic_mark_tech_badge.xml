@@ -1,0 +1,85 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="150dp"
+    android:height="44dp"
+    android:viewportWidth="300"
+    android:viewportHeight="88">
+
+    <!-- Dark Navy Pill Background -->
+    <path
+        android:fillColor="#0B1F44"
+        android:pathData="M 16,4 L 284,4 A 12,12 0 0,1 296,16 L 296,72 A 12,12 0 0,1 284,84 L 16,84 A 12,12 0 0,1 4,72 L 4,16 A 12,12 0 0,1 16,4 Z" />
+
+    <!-- Border -->
+    <path
+        android:strokeColor="#1E3A8A"
+        android:strokeWidth="2"
+        android:pathData="M 16,4 L 284,4 A 12,12 0 0,1 296,16 L 296,72 A 12,12 0 0,1 284,84 L 16,84 A 12,12 0 0,1 4,72 L 4,16 A 12,12 0 0,1 16,4 Z" />
+
+    <!-- 'M' Monogram -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M 18,32 L 28,26 L 28,64 L 18,64 Z" />
+    <path
+        android:fillColor="#E2E8F0"
+        android:pathData="M 28,26 L 40,42 L 40,52 L 28,36 Z" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M 40,42 L 50,30 L 50,64 L 40,64 Z" />
+
+    <!-- 'T' Monogram -->
+    <path
+        android:fillColor="#38BDF8"
+        android:pathData="M 34,32 L 62,16 L 72,16 L 42,35 Z" />
+    <path
+        android:fillColor="#2563EB"
+        android:pathData="M 42,35 L 72,16 L 72,26 L 48,42 Z" />
+    <path
+        android:fillColor="#1D4ED8"
+        android:pathData="M 58,25 L 68,19 L 68,64 L 58,64 Z" />
+
+    <!-- Wordmark "MARK" (White) -->
+    <!-- M -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M 88,32 L 94,32 L 100,50 L 106,32 L 112,32 L 112,62 L 107,62 L 107,40 L 102,56 L 98,56 L 93,40 L 93,62 L 88,62 Z" />
+    <!-- A -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M 124,32 L 131,32 L 140,62 L 134,62 L 132,54 L 123,54 L 121,62 L 115,62 Z M 125,48 L 130,48 L 127.5,39 Z" />
+    <!-- R -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M 144,32 L 155,32 C 160,32 163,35 163,39 C 163,43 160,46 156,47 L 164,62 L 158,62 L 151,48 L 149,48 L 149,62 L 144,62 Z M 149,37 L 149,44 L 154,44 C 156.5,44 158,43 158,40.5 C 158,38 156.5,37 154,37 Z" />
+    <!-- K -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M 167,32 L 172,32 L 172,44 L 181,32 L 188,32 L 179,45 L 189,62 L 183,62 L 175,49 L 172,53 L 172,62 L 167,62 Z" />
+
+    <!-- Hyphen -->
+    <path
+        android:fillColor="#94A3B8"
+        android:pathData="M 193,45 L 201,45 L 201,49 L 193,49 Z" />
+
+    <!-- "TECH" (Electric Blue #2563EB) -->
+    <!-- T -->
+    <path
+        android:fillColor="#2563EB"
+        android:pathData="M 205,32 L 221,32 L 221,37 L 216,37 L 216,62 L 210,62 L 210,37 L 205,37 Z" />
+    <!-- E -->
+    <path
+        android:fillColor="#2563EB"
+        android:pathData="M 224,32 L 238,32 L 238,37 L 230,37 L 230,44 L 237,44 L 237,49 L 230,49 L 230,57 L 239,57 L 239,62 L 224,62 Z" />
+    <!-- C -->
+    <path
+        android:fillColor="#2563EB"
+        android:pathData="M 254,32 C 261,32 264,36 264,38 L 258,40 C 258,38 256,36.5 253,36.5 C 248,36.5 246,41 246,47 C 246,53 248,57.5 253,57.5 C 256,57.5 258,56 258,54 L 264,56 C 264,58 261,62 254,62 C 244,62 240,55 240,47 C 240,39 244,32 254,32 Z" />
+    <!-- H -->
+    <path
+        android:fillColor="#2563EB"
+        android:pathData="M 268,32 L 274,32 L 274,44 L 282,44 L 282,32 L 288,32 L 288,62 L 282,62 L 282,49 L 274,49 L 274,62 L 268,62 Z" />
+
+    <!-- Tagline "WHERE TECHNOLOGY MEETS GROWTH." in tiny cool grey dots/lettering hint -->
+    <path
+        android:fillColor="#94A3B8"
+        android:pathData="M 88,72 L 288,72 L 288,73 L 88,73 Z" />
+</vector>
