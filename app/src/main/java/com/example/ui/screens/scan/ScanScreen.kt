@@ -1,5 +1,7 @@
 package com.example.ui.screens.scan
 
+import android.Manifest
+import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.ImageDecoder
@@ -8,6 +10,7 @@ import android.os.Build
 import android.provider.MediaStore
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.content.ContextCompat
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -182,14 +185,43 @@ fun ScanScreen(
         }
     }
 
-    val launchHighResCamera = {
+    var showCameraPermissionDeniedDialog by remember { mutableStateOf(false) }
+
+    val launchCameraSafely = {
         try {
             val (uri, file) = ImageStorageUtil.createTempPictureUri(context)
             tempCameraUri = uri
             tempCameraFile = file
             takePictureLauncher.launch(uri)
         } catch (e: Exception) {
-            previewCameraLauncher.launch(null)
+            try {
+                previewCameraLauncher.launch(null)
+            } catch (err: Exception) {
+                showCameraPermissionDeniedDialog = true
+            }
+        }
+    }
+
+    val cameraPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { isGranted: Boolean ->
+        if (isGranted) {
+            launchCameraSafely()
+        } else {
+            showCameraPermissionDeniedDialog = true
+        }
+    }
+
+    val requestCameraOrLaunch = {
+        val hasPermission = ContextCompat.checkSelfPermission(
+            context,
+            Manifest.permission.CAMERA
+        ) == PackageManager.PERMISSION_GRANTED
+
+        if (hasPermission) {
+            launchCameraSafely()
+        } else {
+            cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
         }
     }
 
@@ -208,7 +240,7 @@ fun ScanScreen(
         totalPieces = viewModel.totalPieces,
         typesCount = viewModel.typesCount,
         summaryText = viewModel.generateSummaryText(),
-        onCameraClick = launchHighResCamera,
+        onCameraClick = requestCameraOrLaunch,
         onUploadClick = {
             galleryLauncher.launch(
                 androidx.activity.result.PickVisualMediaRequest(
@@ -283,6 +315,40 @@ fun ScanScreen(
             dismissButton = {
                 TextButton(onClick = { showCustomAssortmentDialog = false }) {
                     Text("Cancel", color = Color.White)
+                }
+            },
+            containerColor = CacaoDark
+        )
+    }
+
+    // Dialog: Camera Permission Denied / Rationale
+    if (showCameraPermissionDeniedDialog) {
+        AlertDialog(
+            onDismissRequest = { showCameraPermissionDeniedDialog = false },
+            title = {
+                Text("Camera Permission Needed", fontFamily = PlayfairFontFamily, color = GoldLight)
+            },
+            text = {
+                Text(
+                    "Camera access is required to take photos of chocolate trays directly. You can grant camera permission, or upload a photo from your gallery.",
+                    color = Color(0xFFD7CCC8),
+                    fontSize = 14.sp
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        showCameraPermissionDeniedDialog = false
+                        cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = GoldPrimary, contentColor = CacaoBlack)
+                ) {
+                    Text("Grant Permission", fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showCameraPermissionDeniedDialog = false }) {
+                    Text("Dismiss", color = Color.White)
                 }
             },
             containerColor = CacaoDark

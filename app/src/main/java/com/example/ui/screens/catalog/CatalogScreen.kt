@@ -1,9 +1,12 @@
 package com.example.ui.screens.catalog
 
+import android.Manifest
+import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.content.ContextCompat
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -518,6 +521,36 @@ private fun ProductFormDialog(
         }
     }
 
+    val cameraPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { isGranted: Boolean ->
+        if (isGranted) {
+            try {
+                cameraLauncher.launch(null)
+            } catch (e: Exception) {
+                errorMessage = "Unable to start camera: ${e.localizedMessage}"
+            }
+        } else {
+            errorMessage = "Camera permission is needed to take photos. You can also upload from Gallery."
+        }
+    }
+
+    val requestCameraAndLaunch = {
+        val hasPermission = ContextCompat.checkSelfPermission(
+            context,
+            Manifest.permission.CAMERA
+        ) == PackageManager.PERMISSION_GRANTED
+        if (hasPermission) {
+            try {
+                cameraLauncher.launch(null)
+            } catch (e: Exception) {
+                errorMessage = "Unable to start camera: ${e.localizedMessage}"
+            }
+        } else {
+            cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
+        }
+    }
+
     // Gallery launcher for chocolate photo
     val galleryLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.PickVisualMedia()
@@ -579,7 +612,7 @@ private fun ProductFormDialog(
                         Column(modifier = Modifier.weight(1f)) {
                             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                 Button(
-                                    onClick = { cameraLauncher.launch(null) },
+                                    onClick = requestCameraAndLaunch,
                                     colors = ButtonDefaults.buttonColors(containerColor = GoldPrimary, contentColor = CacaoBlack),
                                     shape = RoundedCornerShape(8.dp),
                                     contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp),
