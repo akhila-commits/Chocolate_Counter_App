@@ -1,0 +1,6 @@
+{
+  "name": "Revello Counter",
+  "description": "Smart AI chocolate counter & tally app for Revello Speciality Outlet to count assorted artisan chocolates and calculate totals.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

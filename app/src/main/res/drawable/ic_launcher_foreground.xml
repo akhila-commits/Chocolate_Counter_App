@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Bonbon base pedestal / shadow -->
+    <path
+        android:fillColor="#210E08"
+        android:pathData="M34,70 C34,66 42,64 54,64 C66,64 74,66 74,70 C74,74 66,76 54,76 C42,76 34,74 34,70 Z" />
+    <!-- Bonbon main body -->
+    <path
+        android:fillColor="#542E1F"
+        android:pathData="M35,66 C35,50 42,36 54,36 C66,36 73,50 73,66 C73,70 65,72 54,72 C43,72 35,70 35,66 Z" />
+    <!-- Bonbon highlight facet -->
+    <path
+        android:fillColor="#6E3D2A"
+        android:pathData="M40,58 C41,47 46,39 54,38 C52,43 51,52 52,60 C47,60 42,59 40,58 Z" />
+    <!-- Golden artisan drizzle 1 -->
+    <path
+        android:fillColor="#00000000"
+        android:strokeColor="#FFD54F"
+        android:strokeWidth="3.2"
+        android:strokeLineCap="round"
+        android:pathData="M42,48 Q54,42 66,50" />
+    <!-- Golden artisan drizzle 2 -->
+    <path
+        android:fillColor="#00000000"
+        android:strokeColor="#FFC107"
+        android:strokeWidth="3.2"
+        android:strokeLineCap="round"
+        android:pathData="M39,57 Q54,51 69,59" />
+    <!-- Golden artisan drizzle 3 -->
+    <path
+        android:fillColor="#00000000"
+        android:strokeColor="#FFE082"
+        android:strokeWidth="2.5"
+        android:strokeLineCap="round"
+        android:pathData="M44,65 Q54,61 64,66" />
+    <!-- Gold leaf flake on top crown -->
+    <path
+        android:fillColor="#FFF59D"
+        android:pathData="M54,32 L56,36 L60,37 L57,40 L58,44 L54,42 L50,44 L51,40 L48,37 L52,36 Z" />
+</vector>
