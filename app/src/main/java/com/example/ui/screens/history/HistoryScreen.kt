@@ -23,10 +23,12 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.FilterList
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Receipt
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -36,6 +38,8 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -91,8 +95,7 @@ fun HistoryScreen(
 ) {
     val scans by viewModel.filteredScans.collectAsStateWithLifecycle()
     val allScans by viewModel.allScans.collectAsStateWithLifecycle()
-    val distinctAssortments by viewModel.distinctAssortments.collectAsStateWithLifecycle()
-    val selectedFilter by viewModel.selectedAssortmentFilter.collectAsStateWithLifecycle()
+    val searchQuery by viewModel.searchQuery.collectAsStateWithLifecycle()
 
     val snackbarHostState = remember { SnackbarHostState() }
     var selectedScanForDetail by remember { mutableStateOf<ScanRecord?>(null) }
@@ -122,73 +125,59 @@ fun HistoryScreen(
             item {
                 Column(modifier = Modifier.padding(16.dp)) {
                     Text(
-                        text = "Assortment Tally History",
+                        text = "Order Tally History",
                         fontFamily = PlayfairFontFamily,
                         fontSize = 24.sp,
                         fontWeight = FontWeight.Bold,
                         color = GoldLight
                     )
                     Text(
-                        text = "Persisted counts & price snapshots for each chocolate box assortment",
+                        text = "Persisted counts, order numbers & price snapshots",
                         style = MaterialTheme.typography.bodySmall,
                         color = Color(0xFFD7CCC8)
                     )
                 }
             }
 
-            // Assortment Filter Chips
-            if (distinctAssortments.isNotEmpty()) {
-                item {
-                    Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.Default.FilterList, contentDescription = null, tint = GoldPrimary, modifier = Modifier.size(16.dp))
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text("Filter by Assortment:", color = GoldLight, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
-                        }
-                        Spacer(modifier = Modifier.height(6.dp))
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .horizontalScroll(rememberScrollState()),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            // "All" filter chip
-                            val isAllSelected = selectedFilter == null
-                            Surface(
-                                color = if (isAllSelected) GoldPrimary else CacaoDark,
-                                shape = RoundedCornerShape(8.dp),
-                                border = BorderStroke(1.dp, if (isAllSelected) GoldLight else CacaoBorder),
-                                modifier = Modifier.clickable { viewModel.setAssortmentFilter(null) }
-                            ) {
-                                Text(
-                                    text = "All Assortments (${allScans.size})",
-                                    color = if (isAllSelected) CacaoBlack else Color.White,
-                                    fontSize = 12.sp,
-                                    fontWeight = if (isAllSelected) FontWeight.Bold else FontWeight.Normal,
-                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
-                                )
-                            }
-
-                            distinctAssortments.forEach { name ->
-                                val isSelected = selectedFilter.equals(name, ignoreCase = true)
-                                Surface(
-                                    color = if (isSelected) GoldPrimary else CacaoDark,
-                                    shape = RoundedCornerShape(8.dp),
-                                    border = BorderStroke(1.dp, if (isSelected) GoldLight else CacaoBorder),
-                                    modifier = Modifier.clickable { viewModel.setAssortmentFilter(name) }
-                                ) {
-                                    Text(
-                                        text = name,
-                                        color = if (isSelected) CacaoBlack else Color.White,
-                                        fontSize = 12.sp,
-                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-                                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
-                                    )
+            // Search by Order Number
+            item {
+                Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp)) {
+                    OutlinedTextField(
+                        value = searchQuery,
+                        onValueChange = { viewModel.setSearchQuery(it) },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("order_search_input"),
+                        placeholder = { Text("Search by Order Number (e.g. ORD-1001)...", color = Color(0xFFBCAAA4), fontSize = 13.sp) },
+                        leadingIcon = {
+                            Icon(Icons.Default.Search, contentDescription = "Search", tint = GoldPrimary)
+                        },
+                        trailingIcon = {
+                            if (searchQuery.isNotEmpty()) {
+                                IconButton(onClick = { viewModel.setSearchQuery("") }) {
+                                    Icon(Icons.Default.Close, contentDescription = "Clear", tint = Color.Gray)
                                 }
                             }
-                        }
-                        Spacer(modifier = Modifier.height(10.dp))
-                    }
+                        },
+                        singleLine = true,
+                        shape = RoundedCornerShape(12.dp),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedTextColor = GoldLight,
+                            unfocusedTextColor = Color.White,
+                            focusedBorderColor = GoldPrimary,
+                            unfocusedBorderColor = CacaoBorder,
+                            focusedContainerColor = CacaoDark,
+                            unfocusedContainerColor = CacaoDark
+                        )
+                    )
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Text(
+                        text = if (searchQuery.isBlank()) "Showing all ${allScans.size} order tallies" else "Showing ${scans.size} result${if (scans.size == 1) "" else "s"} for \"$searchQuery\"",
+                        color = GoldPrimary,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Medium,
+                        modifier = Modifier.padding(start = 4.dp)
+                    )
                 }
             }
 
@@ -211,7 +200,7 @@ fun HistoryScreen(
                         }
                         Spacer(modifier = Modifier.height(16.dp))
                         Text(
-                            text = if (selectedFilter != null) "No tallies found for $selectedFilter" else "No saved scans yet",
+                            text = if (searchQuery.isNotBlank()) "No orders found matching '$searchQuery'" else "No saved order tallies yet",
                             fontFamily = PlayfairFontFamily,
                             fontSize = 18.sp,
                             color = GoldLight,
@@ -219,7 +208,7 @@ fun HistoryScreen(
                         )
                         Spacer(modifier = Modifier.height(8.dp))
                         Text(
-                            text = "When shop counter staff tallies a tray of chocolates, save it to access the receipt breakdown here.",
+                            text = "When shop counter staff tallies a tray of chocolates, save it with an order number to review it here.",
                             color = Color(0xFFBCAAA4),
                             fontSize = 13.sp,
                             textAlign = androidx.compose.ui.text.style.TextAlign.Center
@@ -248,7 +237,7 @@ fun HistoryScreen(
             title = {
                 Column {
                     Text(
-                        text = scan.assortmentName,
+                        text = "Order #${scan.orderNumber}",
                         fontFamily = PlayfairFontFamily,
                         fontSize = 20.sp,
                         color = GoldLight
@@ -364,7 +353,7 @@ fun HistoryScreen(
             },
             text = {
                 Text(
-                    "This will remove the saved tally of ${formatLKR(scan.totalAmount)} for ${scan.assortmentName} from history.",
+                    "This will remove the saved tally of ${formatLKR(scan.totalAmount)} for Order #${scan.orderNumber} from history.",
                     color = Color(0xFFD7CCC8)
                 )
             },
@@ -455,9 +444,9 @@ private fun ScanRecordCard(
 
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = scan.assortmentName,
-                    color = Color.White,
-                    fontWeight = FontWeight.SemiBold,
+                    text = "Order #${scan.orderNumber}",
+                    color = GoldLight,
+                    fontWeight = FontWeight.Bold,
                     fontSize = 15.sp
                 )
                 Spacer(modifier = Modifier.height(2.dp))

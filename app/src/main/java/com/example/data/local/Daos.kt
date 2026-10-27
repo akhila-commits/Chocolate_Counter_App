@@ -54,17 +54,23 @@ interface ScanRecordDao {
     @Query("SELECT * FROM scan_records ORDER BY timestamp DESC")
     fun getAllScanRecords(): Flow<List<ScanRecord>>
 
-    @Query("SELECT * FROM scan_records WHERE LOWER(assortmentName) = LOWER(:assortment) ORDER BY timestamp DESC")
-    fun getScanRecordsByAssortment(assortment: String): Flow<List<ScanRecord>>
+    @Query("SELECT * FROM scan_records WHERE LOWER(orderNumber) = LOWER(:orderNumber) ORDER BY timestamp DESC")
+    fun getScanRecordsByOrderNumber(orderNumber: String): Flow<List<ScanRecord>>
 
-    @Query("SELECT DISTINCT assortmentName FROM scan_records WHERE assortmentName IS NOT NULL AND assortmentName != '' ORDER BY assortmentName ASC")
-    fun getDistinctAssortments(): Flow<List<String>>
+    @Query("SELECT * FROM scan_records WHERE LOWER(orderNumber) LIKE '%' || LOWER(:query) || '%' ORDER BY timestamp DESC")
+    fun searchScanRecordsByOrderNumber(query: String): Flow<List<ScanRecord>>
+
+    @Query("SELECT * FROM scan_records WHERE LOWER(orderNumber) = LOWER(:orderNumber) LIMIT 1")
+    suspend fun getScanRecordByOrderNumberSingle(orderNumber: String): ScanRecord?
 
     @Query("SELECT * FROM scan_records WHERE id = :id LIMIT 1")
     suspend fun getScanRecordById(id: Long): ScanRecord?
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertScanRecord(record: ScanRecord): Long
+
+    @Update
+    suspend fun updateScanRecord(record: ScanRecord)
 
     @Delete
     suspend fun deleteScanRecord(record: ScanRecord)

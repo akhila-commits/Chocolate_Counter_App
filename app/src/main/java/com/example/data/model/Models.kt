@@ -36,7 +36,7 @@ data class ScanRecord(
     @PrimaryKey(autoGenerate = true)
     val id: Long = 0,
     val timestamp: Long = System.currentTimeMillis(),
-    val assortmentName: String = "Assorted Tray",
+    val orderNumber: String = "",
     val photoUri: String? = null,
     val sampleTrayTitle: String? = null,
     val totalAmount: Double, // Total price in LKR calculated in app code

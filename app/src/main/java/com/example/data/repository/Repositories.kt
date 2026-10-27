@@ -86,14 +86,30 @@ class ProductRepository(private val productDao: ProductDao) {
 
 class ScanRepository(private val scanRecordDao: ScanRecordDao) {
     val allScans: Flow<List<ScanRecord>> = scanRecordDao.getAllScanRecords()
-    val distinctAssortments: Flow<List<String>> = scanRecordDao.getDistinctAssortments()
 
-    fun getScansByAssortment(assortment: String): Flow<List<ScanRecord>> {
-        return scanRecordDao.getScanRecordsByAssortment(assortment)
+    fun searchByOrderNumber(query: String): Flow<List<ScanRecord>> {
+        return scanRecordDao.searchScanRecordsByOrderNumber(query)
+    }
+
+    suspend fun getScanByOrderNumber(orderNumber: String): ScanRecord? {
+        return scanRecordDao.getScanRecordByOrderNumberSingle(orderNumber)
+    }
+
+    suspend fun saveOrUpdateScan(record: ScanRecord): Long {
+        val existing = if (record.orderNumber.isNotBlank()) {
+            scanRecordDao.getScanRecordByOrderNumberSingle(record.orderNumber)
+        } else null
+
+        return if (existing != null && record.id == 0L) {
+            val updated = record.copy(id = existing.id)
+            scanRecordDao.insertScanRecord(updated)
+        } else {
+            scanRecordDao.insertScanRecord(record)
+        }
     }
 
     suspend fun saveScan(record: ScanRecord): Long {
-        return scanRecordDao.insertScanRecord(record)
+        return saveOrUpdateScan(record)
     }
 
     suspend fun deleteScan(record: ScanRecord) {

@@ -27,8 +27,12 @@ class GeminiVisionService {
 
     companion object {
         private const val TAG = "GeminiVisionService"
-        // Active Gemini models
-        private const val MODEL_NAME = "gemini-2.5-flash"
+        // Candidate Gemini models: gemini-3.8-flash is the latest recommended model
+        private val CANDIDATE_MODELS = listOf(
+            "gemini-3.8-flash",
+            "gemini-2.0-flash",
+            "gemini-1.5-flash"
+        )
     }
 
     suspend fun recognizeChocolates(
@@ -107,26 +111,43 @@ class GeminiVisionService {
                 put("generationConfig", generationConfig)
             }
 
-            val url = "https://generativelanguage.googleapis.com/v1beta/models/$MODEL_NAME:generateContent?key=$apiKey"
             val requestBody = requestJson.toString().toRequestBody("application/json".toMediaType())
-            val request = Request.Builder()
-                .url(url)
-                .post(requestBody)
-                .build()
 
-            val response = client.newCall(request).execute()
-            val responseBody = response.body?.string().orEmpty()
+            var lastFailure: Exception? = null
 
-            if (!response.isSuccessful) {
-                Log.e(TAG, "Gemini API error ${response.code}: $responseBody")
-                // If API returned error (e.g. quota or invalid key), provide helpful message or fallback
-                return@withContext Result.failure(
-                    Exception("Gemini API error (${response.code}): ${parseErrorMessage(responseBody)}")
-                )
+            // Iterate through candidate models starting with gemini-3.8-flash
+            for (model in CANDIDATE_MODELS) {
+                try {
+                    val url = "https://generativelanguage.googleapis.com/v1beta/models/$model:generateContent?key=$apiKey"
+                    val request = Request.Builder()
+                        .url(url)
+                        .post(requestBody)
+                        .build()
+
+                    val response = client.newCall(request).execute()
+                    val responseBody = response.body?.string().orEmpty()
+
+                    if (response.isSuccessful) {
+                        Log.i(TAG, "Successfully recognized tray using $model")
+                        val parsedResult = parseGeminiResponse(responseBody, catalog)
+                        return@withContext Result.success(parsedResult)
+                    }
+
+                    val parsedMsg = parseErrorMessage(responseBody)
+                    Log.w(TAG, "Model $model returned error ${response.code}: $parsedMsg")
+                    lastFailure = Exception("Gemini API error (${response.code}) with $model: $parsedMsg")
+
+                    // Only continue trying next model if 404 (model not found/deprecated) or 400 (unsupported model)
+                    if (response.code != 404 && response.code != 400) {
+                        return@withContext Result.failure(Exception("Gemini API error (${response.code}): $parsedMsg"))
+                    }
+                } catch (e: Exception) {
+                    Log.w(TAG, "Request exception with $model: ${e.message}")
+                    lastFailure = e
+                }
             }
 
-            val parsedResult = parseGeminiResponse(responseBody, catalog)
-            Result.success(parsedResult)
+            Result.failure(lastFailure ?: Exception("Recognition request failed across available models"))
         } catch (e: Exception) {
             Log.e(TAG, "Recognition failed", e)
             Result.failure(e)

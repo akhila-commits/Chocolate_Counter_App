@@ -35,21 +35,18 @@ class HistoryViewModel(application: Application) : AndroidViewModel(application)
             initialValue = emptyList()
         )
 
-    val distinctAssortments: StateFlow<List<String>> = repository.distinctAssortments
-        .stateIn(
-            scope = viewModelScope,
-            started = SharingStarted.WhileSubscribed(5000),
-            initialValue = emptyList()
-        )
+    private val _searchQuery = MutableStateFlow("")
+    val searchQuery: StateFlow<String> = _searchQuery.asStateFlow()
 
-    private val _selectedAssortmentFilter = MutableStateFlow<String?>(null)
-    val selectedAssortmentFilter: StateFlow<String?> = _selectedAssortmentFilter.asStateFlow()
-
-    val filteredScans: StateFlow<List<ScanRecord>> = combine(allScans, _selectedAssortmentFilter) { scans, filter ->
-        if (filter.isNullOrBlank()) {
+    val filteredScans: StateFlow<List<ScanRecord>> = combine(allScans, _searchQuery) { scans, query ->
+        val trimmed = query.trim()
+        if (trimmed.isBlank()) {
             scans
         } else {
-            scans.filter { it.assortmentName.equals(filter, ignoreCase = true) }
+            scans.filter { 
+                it.orderNumber.contains(trimmed, ignoreCase = true) ||
+                it.summaryText.contains(trimmed, ignoreCase = true)
+            }
         }
     }.stateIn(
         scope = viewModelScope,
@@ -60,14 +57,14 @@ class HistoryViewModel(application: Application) : AndroidViewModel(application)
     private val _snackbarEvent = MutableSharedFlow<String>()
     val snackbarEvent: SharedFlow<String> = _snackbarEvent.asSharedFlow()
 
-    fun setAssortmentFilter(filter: String?) {
-        _selectedAssortmentFilter.value = filter
+    fun setSearchQuery(query: String) {
+        _searchQuery.value = query
     }
 
     fun deleteScan(record: ScanRecord) {
         viewModelScope.launch {
             repository.deleteScan(record)
-            _snackbarEvent.emit("Scan deleted from history")
+            _snackbarEvent.emit("Order #${record.orderNumber} deleted from history")
         }
     }
 

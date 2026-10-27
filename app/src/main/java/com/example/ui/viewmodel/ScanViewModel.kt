@@ -50,9 +50,9 @@ class ScanViewModel(application: Application) : AndroidViewModel(application) {
     private val _sampleTrayTitle = MutableStateFlow<String?>(null)
     val sampleTrayTitle: StateFlow<String?> = _sampleTrayTitle.asStateFlow()
 
-    // Assortment classification for the tray tally
-    private val _assortmentName = MutableStateFlow("12-Piece Deluxe Box")
-    val assortmentName: StateFlow<String> = _assortmentName.asStateFlow()
+    // Order reference number for the tray tally
+    private val _orderNumber = MutableStateFlow(generateDefaultOrderNumber())
+    val orderNumber: StateFlow<String> = _orderNumber.asStateFlow()
 
     // Enhanced camera framing grid overlay
     private val _showGridOverlay = MutableStateFlow(true)
@@ -83,8 +83,18 @@ class ScanViewModel(application: Application) : AndroidViewModel(application) {
     val typesCount: Int
         get() = _scanItems.value.count { it.count > 0 }
 
-    fun setAssortmentName(name: String) {
-        _assortmentName.value = name.trim().ifEmpty { "Custom Assortment" }
+    fun setOrderNumber(number: String) {
+        val trimmed = number.trim()
+        _orderNumber.value = if (trimmed.isEmpty()) generateDefaultOrderNumber() else trimmed
+    }
+
+    fun generateNewOrderNumber() {
+        _orderNumber.value = generateDefaultOrderNumber()
+    }
+
+    private fun generateDefaultOrderNumber(): String {
+        val randomDigits = (1000..9999).random()
+        return "ORD-$randomDigits"
     }
 
     fun toggleGridOverlay() {
@@ -95,11 +105,11 @@ class ScanViewModel(application: Application) : AndroidViewModel(application) {
         _customApiKey.value = key.trim()
     }
 
-    fun onImageSelected(bitmap: Bitmap, trayTitle: String? = null, defaultAssortment: String? = null) {
+    fun onImageSelected(bitmap: Bitmap, trayTitle: String? = null, specificOrderNumber: String? = null) {
         _selectedBitmap.value = bitmap
         _sampleTrayTitle.value = trayTitle
-        if (defaultAssortment != null) {
-            _assortmentName.value = defaultAssortment
+        if (specificOrderNumber != null && specificOrderNumber.isNotBlank()) {
+            _orderNumber.value = specificOrderNumber
         }
         _uiState.value = ScanUiState.Idle
         _scanItems.value = emptyList()
@@ -117,7 +127,7 @@ class ScanViewModel(application: Application) : AndroidViewModel(application) {
                 return@launch
             }
 
-            _uiState.value = ScanUiState.Analyzing("Analyzing tray for ${_assortmentName.value}...")
+            _uiState.value = ScanUiState.Analyzing("Analyzing tray for Order #${_orderNumber.value}...")
             val result = visionService.recognizeChocolates(
                 bitmap = bitmap,
                 catalog = catalog,
@@ -151,6 +161,41 @@ class ScanViewModel(application: Application) : AndroidViewModel(application) {
             }.onFailure { err ->
                 _uiState.value = ScanUiState.Error(err.localizedMessage ?: "Recognition failed. Please check connection.")
             }
+        }
+    }
+
+    fun runSimulatedRecognition() {
+        viewModelScope.launch {
+            _uiState.value = ScanUiState.Analyzing("Simulating tray counter...")
+            val catalog = productRepository.getProductList()
+            if (catalog.isEmpty()) {
+                _uiState.value = ScanUiState.Error("Product catalog is empty. Please add products first.")
+                return@launch
+            }
+
+            val rec = visionService.simulateTrayRecognition(catalog)
+            val lineItems = mutableListOf<ScanItem>()
+            rec.items.forEach { detected ->
+                val matchedProduct = catalog.find { it.name.equals(detected.productName, ignoreCase = true) }
+                if (matchedProduct != null && detected.count > 0) {
+                    lineItems.add(
+                        ScanItem(
+                            productName = matchedProduct.name,
+                            unitPrice = matchedProduct.price,
+                            count = detected.count,
+                            confidence = detected.confidence,
+                            shape = matchedProduct.shape,
+                            colorHex = matchedProduct.colorHex
+                        )
+                    )
+                }
+            }
+
+            _scanItems.value = lineItems
+            _unrecognizedCount.value = rec.unrecognizedCount
+            _notes.value = rec.notes
+            val summary = generateSummaryText()
+            _uiState.value = ScanUiState.ResultReady(summary)
         }
     }
 
@@ -262,9 +307,9 @@ class ScanViewModel(application: Application) : AndroidViewModel(application) {
         val types = typesCount
         val total = grandTotal
         val formatted = formatLKR(total)
-        val assortment = _assortmentName.value
+        val order = _orderNumber.value
         return if (pieces > 0) {
-            "[$assortment] $pieces piece${if (pieces == 1) "" else "s"} across $types type${if (types == 1) "" else "s"}. Total: $formatted"
+            "[Order #$order] $pieces piece${if (pieces == 1) "" else "s"} across $types type${if (types == 1) "" else "s"}. Total: $formatted"
         } else {
             "0 pieces counted. Total: LKR 0.00"
         }
@@ -279,10 +324,11 @@ class ScanViewModel(application: Application) : AndroidViewModel(application) {
                     ImageStorageUtil.saveBitmapToInternalStorage(getApplication(), it, "tray_scans")
                 }
 
+                val currentOrderNum = _orderNumber.value
                 val jsonString = scanItemAdapter.toJson(_scanItems.value)
                 val summary = generateSummaryText()
                 val record = ScanRecord(
-                    assortmentName = _assortmentName.value,
+                    orderNumber = currentOrderNum,
                     photoUri = savedPhotoPath,
                     sampleTrayTitle = _sampleTrayTitle.value,
                     totalAmount = grandTotal,
@@ -293,7 +339,9 @@ class ScanViewModel(application: Application) : AndroidViewModel(application) {
                     notes = _notes.value
                 )
                 scanRepository.saveScan(record)
-                _toastEvent.emit("Tally saved for ${_assortmentName.value}")
+                _toastEvent.emit("Order #$currentOrderNum tally saved successfully!")
+                // Automatically generate next order number for the next tray
+                generateNewOrderNumber()
                 onSuccess()
             } catch (e: Exception) {
                 _toastEvent.emit("Failed to save: ${e.message}")
