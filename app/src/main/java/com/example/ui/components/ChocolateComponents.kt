@@ -16,8 +16,19 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.AllInbox
+import androidx.compose.material.icons.filled.BakeryDining
+import androidx.compose.material.icons.filled.Cake
+import androidx.compose.material.icons.filled.CardGiftcard
+import androidx.compose.material.icons.filled.Cookie
+import androidx.compose.material.icons.filled.Icecream
+import androidx.compose.material.icons.filled.LocalCafe
+import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.ViewAgenda
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -34,22 +45,156 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalContext
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
+import com.example.ui.theme.AmberCaramel
 import com.example.ui.theme.CacaoBlack
 import com.example.ui.theme.CacaoBorder
 import com.example.ui.theme.CacaoCard
 import com.example.ui.theme.CacaoDark
+import com.example.ui.theme.GoldDark
 import com.example.ui.theme.GoldLight
 import com.example.ui.theme.GoldPrimary
 import com.example.ui.theme.PlayfairFontFamily
 import java.io.File
+import java.text.NumberFormat
+import java.util.Locale
+
+fun formatLKR(amount: Double): String {
+    val formatter = NumberFormat.getNumberInstance(Locale.US).apply {
+        minimumFractionDigits = 2
+        maximumFractionDigits = 2
+    }
+    return "Rs. " + formatter.format(amount)
+}
+
+fun getCategoryIcon(category: String): ImageVector {
+    return when (category.trim().lowercase()) {
+        "chocolate pieces", "chocolate piece" -> Icons.Default.Cookie
+        "beverages", "beverage" -> Icons.Default.LocalCafe
+        "slabs", "slab" -> Icons.Default.ViewAgenda
+        "gift boxes", "gift box" -> Icons.Default.CardGiftcard
+        "assortment packs", "assortment pack" -> Icons.Default.AllInbox
+        "cakes", "cake" -> Icons.Default.Cake
+        "savory items", "savory item" -> Icons.Default.BakeryDining
+        "ice cream", "gelato" -> Icons.Default.Icecream
+        else -> Icons.Default.Cookie
+    }
+}
+
+@Composable
+fun SizeWeightBadge(
+    size: String,
+    modifier: Modifier = Modifier
+) {
+    if (size.isBlank()) return
+    Surface(
+        modifier = modifier,
+        color = AmberCaramel.copy(alpha = 0.18f),
+        shape = RoundedCornerShape(6.dp),
+        border = androidx.compose.foundation.BorderStroke(1.dp, AmberCaramel.copy(alpha = 0.6f))
+    ) {
+        Text(
+            text = size,
+            color = AmberCaramel,
+            fontSize = 11.sp,
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier.padding(horizontal = 7.dp, vertical = 2.dp)
+        )
+    }
+}
+
+@Composable
+fun CategoryBadge(
+    category: String,
+    modifier: Modifier = Modifier
+) {
+    if (category.isBlank()) return
+    Surface(
+        modifier = modifier,
+        color = CacaoBorder.copy(alpha = 0.5f),
+        shape = RoundedCornerShape(6.dp)
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+        ) {
+            Icon(
+                imageVector = getCategoryIcon(category),
+                contentDescription = null,
+                tint = GoldLight,
+                modifier = Modifier.size(11.dp)
+            )
+            Spacer(modifier = Modifier.width(4.dp))
+            Text(
+                text = category,
+                color = GoldLight,
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Medium
+            )
+        }
+    }
+}
+
+@Composable
+fun QuantityStepper(
+    quantity: Int,
+    onIncrement: () -> Unit,
+    onDecrement: () -> Unit,
+    modifier: Modifier = Modifier,
+    testTagPrefix: String = "stepper"
+) {
+    Row(
+        modifier = modifier
+            .background(CacaoDark, RoundedCornerShape(8.dp))
+            .border(1.dp, GoldPrimary.copy(alpha = 0.5f), RoundedCornerShape(8.dp)),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        IconButton(
+            onClick = onDecrement,
+            modifier = Modifier
+                .size(36.dp)
+                .testTag("${testTagPrefix}_decrement")
+        ) {
+            Icon(
+                imageVector = Icons.Default.Remove,
+                contentDescription = "Decrease count",
+                tint = GoldPrimary,
+                modifier = Modifier.size(16.dp)
+            )
+        }
+
+        Text(
+            text = "$quantity",
+            color = Color.White,
+            fontWeight = FontWeight.Bold,
+            fontSize = 14.sp,
+            modifier = Modifier.padding(horizontal = 8.dp)
+        )
+
+        IconButton(
+            onClick = onIncrement,
+            modifier = Modifier
+                .size(36.dp)
+                .testTag("${testTagPrefix}_increment")
+        ) {
+            Icon(
+                imageVector = Icons.Default.Add,
+                contentDescription = "Increase count",
+                tint = GoldPrimary,
+                modifier = Modifier.size(16.dp)
+            )
+        }
+    }
+}
 
 @Composable
 fun ChocolateThumbnail(
@@ -57,7 +202,8 @@ fun ChocolateThumbnail(
     colorHex: String,
     imageUri: String?,
     modifier: Modifier = Modifier,
-    size: Dp = 46.dp
+    size: Dp = 46.dp,
+    category: String = ""
 ) {
     if (!imageUri.isNullOrBlank()) {
         Box(
@@ -74,7 +220,7 @@ fun ChocolateThumbnail(
                     .data(if (imageUri.startsWith("/")) File(imageUri) else imageUri)
                     .crossfade(true)
                     .build(),
-                contentDescription = "Chocolate Picture",
+                contentDescription = "Product Picture",
                 contentScale = ContentScale.Crop,
                 modifier = Modifier.fillMaxSize()
             )
@@ -83,6 +229,7 @@ fun ChocolateThumbnail(
         ChocolateShapeBadge(
             shape = shape,
             colorHex = colorHex,
+            category = category,
             modifier = modifier,
             size = size
         )
@@ -93,6 +240,7 @@ fun ChocolateThumbnail(
 fun ChocolateShapeBadge(
     shape: String,
     colorHex: String,
+    category: String = "",
     modifier: Modifier = Modifier,
     size: Dp = 44.dp
 ) {
@@ -107,41 +255,47 @@ fun ChocolateShapeBadge(
             .border(1.dp, CacaoBorder, RoundedCornerShape(10.dp)),
         contentAlignment = Alignment.Center
     ) {
-        Canvas(modifier = Modifier.size(size * 0.75f)) {
-            val canvasWidth = this.size.width
-            val canvasHeight = this.size.height
+        if (category.isNotBlank() && category != "Chocolate pieces") {
+            Icon(
+                imageVector = getCategoryIcon(category),
+                contentDescription = null,
+                tint = GoldLight,
+                modifier = Modifier.size(size * 0.55f)
+            )
+        } else {
+            Canvas(modifier = Modifier.size(size * 0.75f)) {
+                val canvasWidth = this.size.width
+                val canvasHeight = this.size.height
 
-            when (shape.lowercase()) {
-                "dome" -> drawChocolateDome(baseColor, canvasWidth, canvasHeight)
-                "truffle" -> drawChocolateTruffle(baseColor, canvasWidth, canvasHeight)
-                "square" -> drawChocolateSquare(baseColor, canvasWidth, canvasHeight)
-                "heart" -> drawChocolateHeart(baseColor, canvasWidth, canvasHeight)
-                "rocher" -> drawChocolateRocher(baseColor, canvasWidth, canvasHeight)
-                "cube" -> drawChocolateCube(baseColor, canvasWidth, canvasHeight)
-                else -> drawChocolateTruffle(baseColor, canvasWidth, canvasHeight)
+                when (shape.lowercase()) {
+                    "dome" -> drawChocolateDome(baseColor, canvasWidth, canvasHeight)
+                    "truffle" -> drawChocolateTruffle(baseColor, canvasWidth, canvasHeight)
+                    "square" -> drawChocolateSquare(baseColor, canvasWidth, canvasHeight)
+                    "heart" -> drawChocolateHeart(baseColor, canvasWidth, canvasHeight)
+                    "rocher" -> drawChocolateRocher(baseColor, canvasWidth, canvasHeight)
+                    "cube" -> drawChocolateCube(baseColor, canvasWidth, canvasHeight)
+                    else -> drawChocolateTruffle(baseColor, canvasWidth, canvasHeight)
+                }
             }
         }
     }
 }
 
 private fun DrawScope.drawChocolateDome(baseColor: Color, w: Float, h: Float) {
-    // Drop shadow
     drawOval(
         color = Color(0x66000000),
         topLeft = Offset(w * 0.1f, h * 0.65f),
         size = Size(w * 0.8f, h * 0.3f)
     )
-    // Main dome gradient
     drawOval(
         brush = Brush.radialGradient(
-            colors = listOf(baseColor.copy(alpha = 1f), Color(0xFF140804)),
+            colors = listOf(baseColor, Color(0xFF140804)),
             center = Offset(w * 0.4f, h * 0.35f),
             radius = w * 0.5f
         ),
         topLeft = Offset(w * 0.1f, h * 0.15f),
         size = Size(w * 0.8f, h * 0.7f)
     )
-    // Gold caramel swirl on dome
     val path = Path().apply {
         moveTo(w * 0.25f, h * 0.45f)
         quadraticTo(w * 0.5f, h * 0.3f, w * 0.75f, h * 0.5f)
@@ -164,7 +318,6 @@ private fun DrawScope.drawChocolateTruffle(baseColor: Color, w: Float, h: Float)
         center = Offset(w * 0.5f, h * 0.5f),
         radius = w * 0.4f
     )
-    // Textured specks (cacao dust / hazelnut crumbs)
     drawCircle(color = GoldLight.copy(alpha = 0.8f), center = Offset(w * 0.4f, h * 0.35f), radius = w * 0.05f)
     drawCircle(color = Color(0x66FFFFFF), center = Offset(w * 0.62f, h * 0.42f), radius = w * 0.04f)
     drawCircle(color = GoldPrimary.copy(alpha = 0.7f), center = Offset(w * 0.48f, h * 0.6f), radius = w * 0.04f)
@@ -187,7 +340,6 @@ private fun DrawScope.drawChocolateSquare(baseColor: Color, w: Float, h: Float) 
         size = Size(w * 0.76f, h * 0.76f),
         cornerRadius = CornerRadius(w * 0.18f, h * 0.18f)
     )
-    // Passion fruit yellow swirl
     val swirl = Path().apply {
         moveTo(w * 0.25f, h * 0.35f)
         quadraticTo(w * 0.5f, h * 0.2f, w * 0.75f, h * 0.35f)
@@ -217,7 +369,6 @@ private fun DrawScope.drawChocolateHeart(baseColor: Color, w: Float, h: Float) {
 }
 
 private fun DrawScope.drawChocolateRocher(baseColor: Color, w: Float, h: Float) {
-    // Irregular jagged rocher cluster
     drawCircle(color = baseColor, center = Offset(w * 0.5f, h * 0.5f), radius = w * 0.36f)
     drawCircle(color = Color(0xFFD49A50), center = Offset(w * 0.35f, h * 0.38f), radius = w * 0.12f)
     drawCircle(color = Color(0xFF8A5328), center = Offset(w * 0.62f, h * 0.42f), radius = w * 0.14f)
@@ -232,13 +383,11 @@ private fun DrawScope.drawChocolateCube(baseColor: Color, w: Float, h: Float) {
         size = Size(w * 0.7f, h * 0.7f),
         cornerRadius = CornerRadius(w * 0.08f, h * 0.08f)
     )
-    // Darker bottom facet
     drawRect(
         color = Color(0x44000000),
         topLeft = Offset(w * 0.15f, h * 0.55f),
         size = Size(w * 0.7f, h * 0.3f)
     )
-    // Top highlight line
     drawLine(
         color = GoldPrimary.copy(alpha = 0.8f),
         start = Offset(w * 0.2f, h * 0.2f),
@@ -248,7 +397,11 @@ private fun DrawScope.drawChocolateCube(baseColor: Color, w: Float, h: Float) {
 }
 
 @Composable
-fun RevelloBrandBanner(modifier: Modifier = Modifier) {
+fun RevelloBrandBanner(
+    title: String = "REVELLO ORDER CALCULATOR",
+    subtitle: String = "Speciality Outlet • Counter POS & Order Tally",
+    modifier: Modifier = Modifier
+) {
     Surface(
         modifier = modifier.fillMaxWidth(),
         color = CacaoBlack,
@@ -257,7 +410,7 @@ fun RevelloBrandBanner(modifier: Modifier = Modifier) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 12.dp),
+                .padding(horizontal = 16.dp, vertical = 10.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Row(
@@ -267,15 +420,15 @@ fun RevelloBrandBanner(modifier: Modifier = Modifier) {
                     imageVector = Icons.Default.Star,
                     contentDescription = null,
                     tint = GoldPrimary,
-                    modifier = Modifier.size(16.dp)
+                    modifier = Modifier.size(15.dp)
                 )
                 Spacer(modifier = Modifier.width(6.dp))
                 Text(
-                    text = "REVELLO SPECIALITY OUTLET",
+                    text = title,
                     fontFamily = PlayfairFontFamily,
                     fontWeight = FontWeight.Bold,
-                    fontSize = 17.sp,
-                    letterSpacing = 1.2.sp,
+                    fontSize = 16.sp,
+                    letterSpacing = 1.1.sp,
                     color = GoldLight
                 )
                 Spacer(modifier = Modifier.width(6.dp))
@@ -283,48 +436,16 @@ fun RevelloBrandBanner(modifier: Modifier = Modifier) {
                     imageVector = Icons.Default.Star,
                     contentDescription = null,
                     tint = GoldPrimary,
-                    modifier = Modifier.size(16.dp)
+                    modifier = Modifier.size(15.dp)
                 )
             }
             Text(
-                text = "Handcrafted Chocolates • Kalutara Counter",
+                text = subtitle,
                 style = MaterialTheme.typography.bodySmall,
                 color = Color(0xFFC7B299),
                 fontSize = 11.sp,
-                letterSpacing = 0.4.sp
+                letterSpacing = 0.3.sp
             )
         }
     }
 }
-
-data class SampleTrayPreset(
-    val id: String,
-    val title: String,
-    val description: String,
-    val pieceCount: Int,
-    val previewColor: Color
-)
-
-val SampleTrayPresets = listOf(
-    SampleTrayPreset(
-        id = "tray_deluxe_12",
-        title = "Deluxe Assorted Box (12 pcs)",
-        description = "4 Hazelnut Truffles, 3 Dark Ganache, 3 Salted Caramel, 2 Ruby Hearts",
-        pieceCount = 12,
-        previewColor = Color(0xFF6B412B)
-    ),
-    SampleTrayPreset(
-        id = "tray_signature_8",
-        title = "Signature Pralines (8 pcs)",
-        description = "3 Pistachio Praline, 3 White Passion Fruit, 2 Ceylon Espresso",
-        pieceCount = 8,
-        previewColor = Color(0xFF381E15)
-    ),
-    SampleTrayPreset(
-        id = "tray_boutique_16",
-        title = "Grand Boutique Platter (16 pcs)",
-        description = "Assortment of all 8 Revello varieties on silver tray",
-        pieceCount = 16,
-        previewColor = Color(0xFFB83A4B)
-    )
-)

@@ -1,29 +1,9 @@
 package com.example.ui.screens.scan
 
-import android.Manifest
-import android.content.pm.PackageManager
-import android.graphics.Bitmap
-import android.graphics.BitmapFactory
-import android.graphics.ImageDecoder
-import android.net.Uri
-import android.os.Build
-import android.provider.MediaStore
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
-import androidx.core.content.ContextCompat
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -37,1215 +17,411 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.CameraAlt
-import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.DeleteOutline
+import androidx.compose.material.icons.filled.Calculate
+import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material.icons.filled.GridOn
-import androidx.compose.material.icons.filled.Key
-import androidx.compose.material.icons.filled.Lightbulb
-import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material.icons.filled.Receipt
-import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.filled.Remove
-import androidx.compose.material.icons.filled.Star
-import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.ShoppingBag
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.scale
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.asImageBitmap
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.example.data.model.PRODUCT_CATEGORIES
 import com.example.data.model.Product
 import com.example.data.model.ScanItem
+import com.example.ui.components.CategoryBadge
 import com.example.ui.components.ChocolateThumbnail
+import com.example.ui.components.QuantityStepper
 import com.example.ui.components.RevelloBrandBanner
-import com.example.ui.components.SampleTrayPreset
-import com.example.ui.components.SampleTrayPresets
-import com.example.ui.theme.AmberCaramel
+import com.example.ui.components.SizeWeightBadge
+import com.example.ui.components.formatLKR
+import com.example.ui.components.getCategoryIcon
 import com.example.ui.theme.CacaoBlack
 import com.example.ui.theme.CacaoBorder
 import com.example.ui.theme.CacaoCard
 import com.example.ui.theme.CacaoDark
-import com.example.ui.theme.CacaoSurface
 import com.example.ui.theme.GoldDark
 import com.example.ui.theme.GoldLight
 import com.example.ui.theme.GoldPrimary
-import com.example.ui.theme.PlayfairFontFamily
-import com.example.ui.theme.RubyBerryColor
-import com.example.ui.viewmodel.ScanUiState
 import com.example.ui.viewmodel.ScanViewModel
-import com.example.ui.viewmodel.formatLKR
-import com.example.util.ImageStorageUtil
-import java.io.File
+import kotlinx.coroutines.flow.collectLatest
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ScanScreen(
     viewModel: ScanViewModel,
     catalogProducts: List<Product>,
     modifier: Modifier = Modifier
 ) {
-    val context = LocalContext.current
-    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
-    val selectedBitmap by viewModel.selectedBitmap.collectAsStateWithLifecycle()
-    val sampleTrayTitle by viewModel.sampleTrayTitle.collectAsStateWithLifecycle()
     val orderNumber by viewModel.orderNumber.collectAsStateWithLifecycle()
-    val showGridOverlay by viewModel.showGridOverlay.collectAsStateWithLifecycle()
+    val searchQuery by viewModel.searchQuery.collectAsStateWithLifecycle()
+    val selectedCategory by viewModel.selectedCategory.collectAsStateWithLifecycle()
     val scanItems by viewModel.scanItems.collectAsStateWithLifecycle()
-    val unrecognizedCount by viewModel.unrecognizedCount.collectAsStateWithLifecycle()
+    val tenderAmount by viewModel.tenderAmount.collectAsStateWithLifecycle()
     val notes by viewModel.notes.collectAsStateWithLifecycle()
-    val customApiKey by viewModel.customApiKey.collectAsStateWithLifecycle()
 
-    var showApiKeyDialog by remember { mutableStateOf(false) }
-    var showAddMissedDialog by remember { mutableStateOf(false) }
-    var showAssignDialog by remember { mutableStateOf(false) }
-    var showEditOrderNumberDialog by remember { mutableStateOf(false) }
-    var editingItemForDirectCount by remember { mutableStateOf<ScanItem?>(null) }
+    val snackbarHostState = remember { SnackbarHostState() }
+    var showEditOrderDialog by rememberSaveable { mutableStateOf(false) }
+    var showOrderCalculatorDialog by rememberSaveable { mutableStateOf(false) }
+    var showClearConfirmDialog by rememberSaveable { mutableStateOf(false) }
+    var showReceiptDialog by rememberSaveable { mutableStateOf(false) }
 
-    // State for high-res camera capture
-    var tempCameraFile by remember { mutableStateOf<File?>(null) }
-    var tempCameraUri by remember { mutableStateOf<Uri?>(null) }
+    LaunchedEffect(Unit) {
+        viewModel.toastEvent.collectLatest { msg ->
+            snackbarHostState.showSnackbar(msg)
+        }
+    }
 
-    val takePictureLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.TakePicture()
-    ) { success: Boolean ->
-        if (success && tempCameraFile != null && tempCameraFile!!.exists()) {
-            val bitmap = BitmapFactory.decodeFile(tempCameraFile!!.absolutePath)
-            if (bitmap != null) {
-                viewModel.onImageSelected(bitmap, "High-Res Counter Camera", orderNumber)
+    val displayedProducts by remember(catalogProducts, searchQuery, selectedCategory) {
+        derivedStateOf {
+            var list = catalogProducts
+            if (!selectedCategory.isNullOrBlank() && selectedCategory != "All") {
+                list = list.filter { it.category.equals(selectedCategory, ignoreCase = true) }
             }
-        }
-    }
-
-    // Quick camera preview fallback
-    val previewCameraLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.TakePicturePreview()
-    ) { bitmap: Bitmap? ->
-        if (bitmap != null) {
-            viewModel.onImageSelected(bitmap, "Counter Snapshot", orderNumber)
-        }
-    }
-
-    // Gallery launcher
-    val galleryLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.PickVisualMedia()
-    ) { uri: Uri? ->
-        if (uri != null) {
-            try {
-                val bitmap = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-                    val source = ImageDecoder.createSource(context.contentResolver, uri)
-                    ImageDecoder.decodeBitmap(source) { decoder, _, _ ->
-                        decoder.allocator = ImageDecoder.ALLOCATOR_SOFTWARE
-                        decoder.isMutableRequired = true
-                    }
-                } else {
-                    @Suppress("DEPRECATION")
-                    MediaStore.Images.Media.getBitmap(context.contentResolver, uri)
-                }
-                viewModel.onImageSelected(bitmap, "Tray Photo Upload", orderNumber)
-            } catch (e: Exception) {
-                // handle error
-            }
-        }
-    }
-
-    var showCameraPermissionDeniedDialog by remember { mutableStateOf(false) }
-
-    val launchCameraSafely = {
-        try {
-            val (uri, file) = ImageStorageUtil.createTempPictureUri(context)
-            tempCameraUri = uri
-            tempCameraFile = file
-            takePictureLauncher.launch(uri)
-        } catch (e: Exception) {
-            try {
-                previewCameraLauncher.launch(null)
-            } catch (err: Exception) {
-                showCameraPermissionDeniedDialog = true
-            }
-        }
-    }
-
-    val cameraPermissionLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.RequestPermission()
-    ) { isGranted: Boolean ->
-        if (isGranted) {
-            launchCameraSafely()
-        } else {
-            showCameraPermissionDeniedDialog = true
-        }
-    }
-
-    val requestCameraOrLaunch = {
-        val hasPermission = ContextCompat.checkSelfPermission(
-            context,
-            Manifest.permission.CAMERA
-        ) == PackageManager.PERMISSION_GRANTED
-
-        if (hasPermission) {
-            launchCameraSafely()
-        } else {
-            cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
-        }
-    }
-
-    ScaffoldScanContent(
-        modifier = modifier,
-        uiState = uiState,
-        selectedBitmap = selectedBitmap,
-        sampleTrayTitle = sampleTrayTitle,
-        orderNumber = orderNumber,
-        showGridOverlay = showGridOverlay,
-        scanItems = scanItems,
-        catalogProducts = catalogProducts,
-        unrecognizedCount = unrecognizedCount,
-        notes = notes,
-        grandTotal = viewModel.grandTotal,
-        totalPieces = viewModel.totalPieces,
-        typesCount = viewModel.typesCount,
-        summaryText = viewModel.generateSummaryText(),
-        onCameraClick = requestCameraOrLaunch,
-        onUploadClick = {
-            galleryLauncher.launch(
-                androidx.activity.result.PickVisualMediaRequest(
-                    ActivityResultContracts.PickVisualMedia.ImageOnly
-                )
-            )
-        },
-        onSampleTraySelect = { preset ->
-            val bitmap = SampleTrayBitmapGenerator.generateTrayBitmap(preset.id)
-            viewModel.onImageSelected(bitmap, preset.title)
-        },
-        onEditOrderNumberClick = { showEditOrderNumberDialog = true },
-        onNewOrderNumberClick = { viewModel.generateNewOrderNumber() },
-        onToggleGrid = { viewModel.toggleGridOverlay() },
-        onCountChocolatesClick = { viewModel.startRecognition() },
-        onManualTallyClick = { viewModel.startManualTally() },
-        onSimulateClick = { viewModel.runSimulatedRecognition() },
-        onRetakeClick = { viewModel.resetScan() },
-        onIncrement = { viewModel.incrementCount(it) },
-        onDecrement = { viewModel.decrementCount(it) },
-        onDirectCountClick = { editingItemForDirectCount = it },
-        onRemoveItem = { viewModel.removeLineItem(it) },
-        onAddMissedClick = { showAddMissedDialog = true },
-        onAssignUnrecognizedClick = { showAssignDialog = true },
-        onSaveScanClick = {
-            viewModel.saveCurrentScan {
-                viewModel.resetScan()
-            }
-        },
-        onApiKeyClick = { showApiKeyDialog = true }
-    )
-
-    // Dialog: Edit Order Number
-    if (showEditOrderNumberDialog) {
-        var inputOrderNumber by remember { mutableStateOf(orderNumber) }
-        AlertDialog(
-            onDismissRequest = { showEditOrderNumberDialog = false },
-            title = {
-                Text("Order Number Reference", fontFamily = PlayfairFontFamily, color = GoldLight)
-            },
-            text = {
-                Column {
-                    Text(
-                        "Set the order number or customer receipt ID for this chocolate tray tally (e.g. ORD-1002, TABLE-4, SPECIAL-01):",
-                        color = Color(0xFFD7CCC8),
-                        fontSize = 13.sp
-                    )
-                    Spacer(modifier = Modifier.height(12.dp))
-                    OutlinedTextField(
-                        value = inputOrderNumber,
-                        onValueChange = { inputOrderNumber = it },
-                        singleLine = true,
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedTextColor = GoldLight,
-                            unfocusedTextColor = Color.White,
-                            focusedBorderColor = GoldPrimary,
-                            unfocusedBorderColor = CacaoBorder
-                        ),
-                        modifier = Modifier.fillMaxWidth().testTag("order_number_input")
-                    )
-                }
-            },
-            confirmButton = {
-                Button(
-                    onClick = {
-                        viewModel.setOrderNumber(inputOrderNumber)
-                        showEditOrderNumberDialog = false
-                    },
-                    colors = ButtonDefaults.buttonColors(containerColor = GoldPrimary, contentColor = CacaoBlack)
-                ) {
-                    Text("Apply", fontWeight = FontWeight.Bold)
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showEditOrderNumberDialog = false }) {
-                    Text("Cancel", color = Color.White)
-                }
-            },
-            containerColor = CacaoDark
-        )
-    }
-
-    // Dialog: Camera Permission Denied / Rationale
-    if (showCameraPermissionDeniedDialog) {
-        AlertDialog(
-            onDismissRequest = { showCameraPermissionDeniedDialog = false },
-            title = {
-                Text("Camera Permission Needed", fontFamily = PlayfairFontFamily, color = GoldLight)
-            },
-            text = {
-                Text(
-                    "Camera access is required to take photos of chocolate trays directly. You can grant camera permission, or upload a photo from your gallery.",
-                    color = Color(0xFFD7CCC8),
-                    fontSize = 14.sp
-                )
-            },
-            confirmButton = {
-                Button(
-                    onClick = {
-                        showCameraPermissionDeniedDialog = false
-                        cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
-                    },
-                    colors = ButtonDefaults.buttonColors(containerColor = GoldPrimary, contentColor = CacaoBlack)
-                ) {
-                    Text("Grant Permission", fontWeight = FontWeight.Bold)
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showCameraPermissionDeniedDialog = false }) {
-                    Text("Dismiss", color = Color.White)
-                }
-            },
-            containerColor = CacaoDark
-        )
-    }
-
-    // Dialog: Direct count input
-    editingItemForDirectCount?.let { item ->
-        var countInput by remember { mutableStateOf(item.count.toString()) }
-        AlertDialog(
-            onDismissRequest = { editingItemForDirectCount = null },
-            title = {
-                Text(
-                    text = "Edit Count: ${item.productName}",
-                    fontFamily = PlayfairFontFamily,
-                    color = GoldLight
-                )
-            },
-            text = {
-                Column {
-                    Text(
-                        text = "Enter exact number of pieces on tray:",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = Color(0xFFD7CCC8)
-                    )
-                    Spacer(modifier = Modifier.height(12.dp))
-                    OutlinedTextField(
-                        value = countInput,
-                        onValueChange = { countInput = it },
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedTextColor = GoldLight,
-                            unfocusedTextColor = Color.White,
-                            focusedBorderColor = GoldPrimary,
-                            unfocusedBorderColor = CacaoBorder
-                        ),
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth().testTag("direct_count_input")
-                    )
-                }
-            },
-            confirmButton = {
-                Button(
-                    onClick = {
-                        val newCount = countInput.toIntOrNull() ?: item.count
-                        viewModel.setCount(item.productName, newCount)
-                        editingItemForDirectCount = null
-                    },
-                    colors = ButtonDefaults.buttonColors(containerColor = GoldPrimary, contentColor = CacaoBlack)
-                ) {
-                    Text("Apply", fontWeight = FontWeight.Bold)
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { editingItemForDirectCount = null }) {
-                    Text("Cancel", color = Color.White)
-                }
-            },
-            containerColor = CacaoDark
-        )
-    }
-
-    // Dialog: Add missed chocolate
-    if (showAddMissedDialog) {
-        AlertDialog(
-            onDismissRequest = { showAddMissedDialog = false },
-            title = {
-                Text(
-                    text = "Add Missed Chocolate",
-                    fontFamily = PlayfairFontFamily,
-                    color = GoldLight
-                )
-            },
-            text = {
-                LazyColumn(modifier = Modifier.height(280.dp)) {
-                    items(catalogProducts) { product ->
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable {
-                                    viewModel.addMissedProduct(product)
-                                    showAddMissedDialog = false
-                                }
-                                .padding(vertical = 8.dp, horizontal = 4.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            ChocolateThumbnail(
-                                shape = product.shape,
-                                colorHex = product.colorHex,
-                                imageUri = product.referenceImageUri,
-                                size = 38.dp
-                            )
-                            Spacer(modifier = Modifier.width(12.dp))
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    text = product.name,
-                                    color = Color.White,
-                                    fontWeight = FontWeight.Medium,
-                                    fontSize = 15.sp
-                                )
-                                Text(
-                                    text = formatLKR(product.price),
-                                    color = GoldLight,
-                                    fontSize = 13.sp
-                                )
-                            }
-                            Icon(Icons.Default.Add, contentDescription = "Add", tint = GoldPrimary)
-                        }
-                        HorizontalDivider(color = CacaoBorder.copy(alpha = 0.5f))
-                    }
-                }
-            },
-            confirmButton = {
-                TextButton(onClick = { showAddMissedDialog = false }) {
-                    Text("Close", color = Color.White)
-                }
-            },
-            containerColor = CacaoDark
-        )
-    }
-
-    // Dialog: Assign unrecognized pieces
-    if (showAssignDialog && unrecognizedCount > 0) {
-        var selectedProduct by remember { mutableStateOf<Product?>(catalogProducts.firstOrNull()) }
-        var quantityToAssign by remember { mutableStateOf(1) }
-
-        AlertDialog(
-            onDismissRequest = { showAssignDialog = false },
-            title = {
-                Text(
-                    text = "Assign Unrecognized Items",
-                    fontFamily = PlayfairFontFamily,
-                    color = GoldLight
-                )
-            },
-            text = {
-                Column {
-                    Text(
-                        text = "You have $unrecognizedCount unrecognized piece(s). Choose which catalog product to assign them to:",
-                        color = Color(0xFFD7CCC8),
-                        fontSize = 14.sp
-                    )
-                    Spacer(modifier = Modifier.height(12.dp))
-                    LazyColumn(modifier = Modifier.height(200.dp)) {
-                        items(catalogProducts) { product ->
-                            val isSelected = selectedProduct?.id == product.id
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clip(RoundedCornerShape(8.dp))
-                                    .background(if (isSelected) CacaoCard else Color.Transparent)
-                                    .clickable { selectedProduct = product }
-                                    .padding(8.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                ChocolateThumbnail(
-                                    shape = product.shape,
-                                    colorHex = product.colorHex,
-                                    imageUri = product.referenceImageUri,
-                                    size = 34.dp
-                                )
-                                Spacer(modifier = Modifier.width(10.dp))
-                                Column(modifier = Modifier.weight(1f)) {
-                                    Text(product.name, color = Color.White, fontSize = 14.sp)
-                                    Text(formatLKR(product.price), color = GoldLight, fontSize = 12.sp)
-                                }
-                                if (isSelected) {
-                                    Icon(Icons.Default.Check, contentDescription = null, tint = GoldPrimary)
-                                }
-                            }
-                        }
-                    }
-                }
-            },
-            confirmButton = {
-                Button(
-                    onClick = {
-                        selectedProduct?.let { prod ->
-                            viewModel.assignUnrecognizedToProduct(prod, quantityToAssign)
-                        }
-                        showAssignDialog = false
-                    },
-                    colors = ButtonDefaults.buttonColors(containerColor = GoldPrimary, contentColor = CacaoBlack)
-                ) {
-                    Text("Assign as Product", fontWeight = FontWeight.Bold)
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showAssignDialog = false }) {
-                    Text("Cancel", color = Color.White)
-                }
-            },
-            containerColor = CacaoDark
-        )
-    }
-
-    // Dialog: Gemini API key configuration
-    if (showApiKeyDialog) {
-        var keyInput by remember { mutableStateOf(customApiKey) }
-        AlertDialog(
-            onDismissRequest = { showApiKeyDialog = false },
-            title = {
-                Text("Gemini API Key Configuration", fontFamily = PlayfairFontFamily, color = GoldLight)
-            },
-            text = {
-                Column {
-                    Text(
-                        "The app automatically uses the server-injected Gemini API key or sample recognition. You can also provide a custom Gemini API key:",
-                        color = Color(0xFFD7CCC8),
-                        fontSize = 13.sp
-                    )
-                    Spacer(modifier = Modifier.height(12.dp))
-                    OutlinedTextField(
-                        value = keyInput,
-                        onValueChange = { keyInput = it },
-                        placeholder = { Text("AIzaSy...", color = Color.Gray) },
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedTextColor = GoldLight,
-                            unfocusedTextColor = Color.White,
-                            focusedBorderColor = GoldPrimary,
-                            unfocusedBorderColor = CacaoBorder
-                        ),
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth().testTag("api_key_input")
-                    )
-                }
-            },
-            confirmButton = {
-                Button(
-                    onClick = {
-                        viewModel.setCustomApiKey(keyInput)
-                        showApiKeyDialog = false
-                    },
-                    colors = ButtonDefaults.buttonColors(containerColor = GoldPrimary, contentColor = CacaoBlack)
-                ) {
-                    Text("Save Key")
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showApiKeyDialog = false }) {
-                    Text("Cancel", color = Color.White)
-                }
-            },
-            containerColor = CacaoDark
-        )
-    }
-}
-
-@Composable
-private fun ScaffoldScanContent(
-    modifier: Modifier,
-    uiState: ScanUiState,
-    selectedBitmap: Bitmap?,
-    sampleTrayTitle: String?,
-    orderNumber: String,
-    showGridOverlay: Boolean,
-    scanItems: List<ScanItem>,
-    catalogProducts: List<Product>,
-    unrecognizedCount: Int,
-    notes: String,
-    grandTotal: Double,
-    totalPieces: Int,
-    typesCount: Int,
-    summaryText: String,
-    onCameraClick: () -> Unit,
-    onUploadClick: () -> Unit,
-    onSampleTraySelect: (SampleTrayPreset) -> Unit,
-    onEditOrderNumberClick: () -> Unit,
-    onNewOrderNumberClick: () -> Unit,
-    onToggleGrid: () -> Unit,
-    onCountChocolatesClick: () -> Unit,
-    onManualTallyClick: () -> Unit,
-    onSimulateClick: () -> Unit,
-    onRetakeClick: () -> Unit,
-    onIncrement: (String) -> Unit,
-    onDecrement: (String) -> Unit,
-    onDirectCountClick: (ScanItem) -> Unit,
-    onRemoveItem: (String) -> Unit,
-    onAddMissedClick: () -> Unit,
-    onAssignUnrecognizedClick: () -> Unit,
-    onSaveScanClick: () -> Unit,
-    onApiKeyClick: () -> Unit
-) {
-    LazyColumn(
-        modifier = modifier
-            .fillMaxSize()
-            .background(CacaoBlack),
-        contentPadding = PaddingValues(bottom = 32.dp)
-    ) {
-        item {
-            RevelloBrandBanner()
-        }
-
-        // Header Action Bar: Title + Key Settings
-        item {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 12.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column {
-                    Text(
-                        text = "Tray Tally & AI Counter",
-                        fontFamily = PlayfairFontFamily,
-                        fontSize = 22.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = GoldLight
-                    )
-                    Text(
-                        text = "Order: #$orderNumber",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = GoldPrimary,
-                        fontWeight = FontWeight.Medium
-                    )
-                }
-                IconButton(
-                    onClick = onApiKeyClick,
-                    modifier = Modifier
-                        .size(48.dp)
-                        .testTag("api_key_button")
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Key,
-                        contentDescription = "API Key Settings",
-                        tint = GoldPrimary
-                    )
+            if (searchQuery.isNotBlank()) {
+                val q = searchQuery.trim()
+                list = list.filter {
+                    it.name.contains(q, ignoreCase = true) ||
+                    it.size.contains(q, ignoreCase = true) ||
+                    it.category.contains(q, ignoreCase = true) ||
+                    it.description.contains(q, ignoreCase = true)
                 }
             }
+            list
         }
+    }
 
-        // Order Number Bar
-        item {
-            OrderNumberBar(
-                orderNumber = orderNumber,
-                onEditOrderNumber = onEditOrderNumberClick,
-                onNewOrderNumber = onNewOrderNumberClick
-            )
-        }
+    val categoriesWithAll = remember { listOf("All") + PRODUCT_CATEGORIES }
 
-        // Photo Input Actions or Tray Preview
-        if (selectedBitmap == null) {
-            item {
-                CaptureOptionsCard(
-                    onCameraClick = onCameraClick,
-                    onUploadClick = onUploadClick,
-                    onDirectManualTallyClick = onManualTallyClick
-                )
-            }
-
-            item {
-                Spacer(modifier = Modifier.height(14.dp))
-                SampleTraySelectorSection(onSelect = onSampleTraySelect)
-            }
-        } else {
-            // Preview card with dual AI & Fast Manual tally options
-            item {
-                TrayPreviewCard(
-                    bitmap = selectedBitmap,
-                    trayTitle = sampleTrayTitle,
+    Scaffold(
+        modifier = modifier.fillMaxSize(),
+        containerColor = CacaoBlack,
+        snackbarHost = { SnackbarHost(snackbarHostState) },
+        bottomBar = {
+            if (scanItems.isNotEmpty()) {
+                BottomOrderSummaryBar(
                     orderNumber = orderNumber,
-                    showGridOverlay = showGridOverlay,
-                    onToggleGrid = onToggleGrid,
-                    isAnalyzing = uiState is ScanUiState.Analyzing,
-                    isResultReady = uiState is ScanUiState.ResultReady,
-                    onCountClick = onCountChocolatesClick,
-                    onManualTallyClick = onManualTallyClick,
-                    onRetakeClick = onRetakeClick
+                    totalPieces = viewModel.totalPieces,
+                    typesCount = viewModel.typesCount,
+                    grandTotal = viewModel.grandTotal,
+                    onOpenCalculator = { showOrderCalculatorDialog = true }
                 )
             }
         }
+    ) { innerPadding ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(innerPadding)
+        ) {
+            RevelloBrandBanner(
+                title = "REVELLO ORDER CALCULATOR",
+                subtitle = "Kalutara Counter • Fast Product Tally & POS"
+            )
 
-        // Loading State during Gemini API call
-        if (uiState is ScanUiState.Analyzing) {
-            item {
-                AnalyzingProgressCard(
-                    statusMessage = (uiState as ScanUiState.Analyzing).statusMessage,
-                    onCancelOrManualTally = onManualTallyClick
-                )
-            }
-        }
+            OrderHeaderBar(
+                orderNumber = orderNumber,
+                grandTotal = viewModel.grandTotal,
+                onEditOrderNumber = { showEditOrderDialog = true },
+                onNewOrder = { viewModel.generateNewOrderNumber() },
+                onOpenCalculator = { showOrderCalculatorDialog = true },
+                hasItems = scanItems.isNotEmpty()
+            )
 
-        // Error State (e.g. 503 high demand or network timeout)
-        if (uiState is ScanUiState.Error) {
-            val errorMsg = (uiState as ScanUiState.Error).message
-            val isHighDemand503 = errorMsg.contains("503") || errorMsg.contains("high demand", ignoreCase = true)
-            item {
-                Card(
+            ProductSearchBar(
+                query = searchQuery,
+                onQueryChange = { viewModel.onSearchQueryChanged(it) },
+                onClear = { viewModel.onSearchQueryChanged("") }
+            )
+
+            CategoryFilterChips(
+                categories = categoriesWithAll,
+                selectedCategory = selectedCategory ?: "All",
+                onSelectCategory = { viewModel.onCategorySelected(it) },
+                products = catalogProducts
+            )
+
+            if (displayedProducts.isEmpty()) {
+                Box(
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(16.dp)
-                        .testTag("scan_error_card"),
-                    colors = CardDefaults.cardColors(containerColor = Color(0xFF381414)),
-                    shape = RoundedCornerShape(12.dp),
-                    border = BorderStroke(1.dp, RubyBerryColor.copy(alpha = 0.6f))
+                        .fillMaxSize()
+                        .padding(24.dp),
+                    contentAlignment = Alignment.Center
                 ) {
-                    Column(modifier = Modifier.padding(16.dp)) {
-                        Row(verticalAlignment = Alignment.Top) {
-                            Icon(
-                                Icons.Default.Warning,
-                                contentDescription = null,
-                                tint = RubyBerryColor,
-                                modifier = Modifier.size(24.dp)
-                            )
-                            Spacer(modifier = Modifier.width(12.dp))
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    text = if (isHighDemand503) "Google AI Server High Demand (503)" else "Recognition Notice",
-                                    fontWeight = FontWeight.Bold,
-                                    color = Color.White,
-                                    fontSize = 15.sp
-                                )
-                                Spacer(modifier = Modifier.height(4.dp))
-                                Text(
-                                    text = if (isHighDemand503) {
-                                        "Google's Gemini vision cloud is currently handling peak traffic (503). You don't have to wait for the servers — switch to Fast Manual Tally to count and finalize Order #$orderNumber right now!"
-                                    } else {
-                                        errorMsg
-                                    },
-                                    color = Color(0xFFFFCDD2),
-                                    fontSize = 13.sp,
-                                    lineHeight = 17.sp
-                                )
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Icon(
+                            imageVector = Icons.Default.Search,
+                            contentDescription = null,
+                            tint = Color(0xFF8D6E63),
+                            modifier = Modifier.size(44.dp)
+                        )
+                        Spacer(modifier = Modifier.height(10.dp))
+                        Text(
+                            text = if (searchQuery.isNotBlank()) "No products matching \"$searchQuery\"" else "No products in this category",
+                            color = Color(0xFFD7CCC8),
+                            fontSize = 15.sp,
+                            fontWeight = FontWeight.Medium
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = "Search another keyword or check the Catalog tab",
+                            color = Color(0xFFA1887F),
+                            fontSize = 12.sp,
+                            textAlign = TextAlign.Center
+                        )
+                    }
+                }
+            } else {
+                LazyColumn(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .testTag("order_product_list"),
+                    contentPadding = PaddingValues(horizontal = 14.dp, vertical = 6.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    items(
+                        items = displayedProducts,
+                        key = { "${it.id}-${it.size}" }
+                    ) { product ->
+                        val currentCount = viewModel.getItemCountForProduct(product)
+                        ProductOrderRow(
+                            product = product,
+                            currentCount = currentCount,
+                            onAdd = { viewModel.addProductToOrder(product, 1) },
+                            onIncrement = {
+                                val item = scanItems.firstOrNull {
+                                    (it.productId != 0L && it.productId == product.id) ||
+                                    (it.productName.equals(product.name, ignoreCase = true) && it.size.equals(product.size, ignoreCase = true))
+                                }
+                                if (item != null) {
+                                    viewModel.incrementCount(item)
+                                } else {
+                                    viewModel.addProductToOrder(product, 1)
+                                }
+                            },
+                            onDecrement = {
+                                val item = scanItems.firstOrNull {
+                                    (it.productId != 0L && it.productId == product.id) ||
+                                    (it.productName.equals(product.name, ignoreCase = true) && it.size.equals(product.size, ignoreCase = true))
+                                }
+                                if (item != null) {
+                                    viewModel.decrementCount(item)
+                                }
                             }
-                        }
-                        Spacer(modifier = Modifier.height(14.dp))
-
-                        // Fast manual tally button as prominent primary action
-                        Button(
-                            onClick = onManualTallyClick,
-                            colors = ButtonDefaults.buttonColors(containerColor = GoldPrimary, contentColor = CacaoBlack),
-                            shape = RoundedCornerShape(8.dp),
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(46.dp)
-                                .testTag("error_manual_tally_button")
-                        ) {
-                            Icon(Icons.Default.Receipt, contentDescription = null, modifier = Modifier.size(18.dp))
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text("⚡ Switch to Fast Manual Tally ($orderNumber)", fontWeight = FontWeight.Bold, fontSize = 14.sp)
-                        }
-
-                        Spacer(modifier = Modifier.height(8.dp))
-
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(10.dp)
-                        ) {
-                            OutlinedButton(
-                                onClick = onCountChocolatesClick,
-                                colors = ButtonDefaults.outlinedButtonColors(contentColor = GoldLight),
-                                border = BorderStroke(1.dp, GoldPrimary),
-                                shape = RoundedCornerShape(8.dp),
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .height(42.dp)
-                                    .testTag("retry_ai_button")
-                            ) {
-                                Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(15.dp))
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Text("Retry Cloud AI", fontWeight = FontWeight.SemiBold, fontSize = 12.sp)
-                            }
-
-                            OutlinedButton(
-                                onClick = onSimulateClick,
-                                colors = ButtonDefaults.outlinedButtonColors(contentColor = AmberCaramel),
-                                border = BorderStroke(1.dp, AmberCaramel),
-                                shape = RoundedCornerShape(8.dp),
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .height(42.dp)
-                                    .testTag("use_simulator_button")
-                            ) {
-                                Icon(Icons.Default.Star, contentDescription = null, modifier = Modifier.size(15.dp))
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Text("Smart Estimator", fontWeight = FontWeight.SemiBold, fontSize = 12.sp)
-                            }
-                        }
+                        )
+                    }
+                    item {
+                        Spacer(modifier = Modifier.height(24.dp))
                     }
                 }
             }
         }
+    }
 
-        // Recognition Results & Line Items Table
-        if (uiState is ScanUiState.ResultReady || (selectedBitmap != null && scanItems.isNotEmpty())) {
-            item {
-                Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
-                    Text(
-                        text = "Order #$orderNumber Tally Results",
-                        fontFamily = PlayfairFontFamily,
-                        fontSize = 18.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = GoldLight
-                    )
-                    Text(
-                        text = "Verify and correct piece counts before saving",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = Color(0xFFC7B299)
-                    )
+    if (showEditOrderDialog) {
+        EditOrderNumberDialog(
+            currentOrderNumber = orderNumber,
+            onDismiss = { showEditOrderDialog = false },
+            onConfirm = { newNum ->
+                viewModel.setOrderNumber(newNum)
+                showEditOrderDialog = false
+            }
+        )
+    }
+
+    if (showOrderCalculatorDialog) {
+        OrderCalculatorDialog(
+            orderNumber = orderNumber,
+            scanItems = scanItems,
+            grandTotal = viewModel.grandTotal,
+            totalPieces = viewModel.totalPieces,
+            typesCount = viewModel.typesCount,
+            tenderAmount = tenderAmount,
+            changeDue = viewModel.changeDue,
+            notes = notes,
+            onNotesChanged = { viewModel.setNotes(it) },
+            onTenderAmountChanged = { viewModel.setTenderAmount(it) },
+            onIncrement = { viewModel.incrementCount(it) },
+            onDecrement = { viewModel.decrementCount(it) },
+            onRemove = { viewModel.removeLineItem(it) },
+            onSave = {
+                viewModel.saveCurrentScan {
+                    showOrderCalculatorDialog = false
                 }
-            }
+            },
+            onClear = { showClearConfirmDialog = true },
+            onViewReceipt = { showReceiptDialog = true },
+            onDismiss = { showOrderCalculatorDialog = false }
+        )
+    }
 
-            // Unrecognized alert if count > 0
-            if (unrecognizedCount > 0) {
-                item {
-                    UnrecognizedAlertCard(
-                        count = unrecognizedCount,
-                        onAssignClick = onAssignUnrecognizedClick
-                    )
-                }
-            }
-
-            // Line items
-            items(scanItems) { item ->
-                val matchedProduct = catalogProducts.find { it.name.equals(item.productName, ignoreCase = true) }
-                ScanItemRow(
-                    item = item,
-                    imageUri = matchedProduct?.referenceImageUri,
-                    onIncrement = { onIncrement(item.productName) },
-                    onDecrement = { onDecrement(item.productName) },
-                    onDirectCountClick = { onDirectCountClick(item) },
-                    onRemove = { onRemoveItem(item.productName) }
-                )
-            }
-
-            // Add missed item action
-            item {
-                OutlinedButton(
-                    onClick = onAddMissedClick,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 8.dp)
-                        .testTag("add_missed_chocolate_button"),
-                    colors = ButtonDefaults.outlinedButtonColors(contentColor = GoldLight),
-                    border = BorderStroke(1.dp, Brush.horizontalGradient(listOf(GoldPrimary, GoldDark)))
+    if (showClearConfirmDialog) {
+        AlertDialog(
+            onDismissRequest = { showClearConfirmDialog = false },
+            containerColor = CacaoCard,
+            title = {
+                Text("Clear Order #$orderNumber?", color = GoldLight, fontWeight = FontWeight.Bold)
+            },
+            text = {
+                Text("Remove all items from the current order tally?", color = Color(0xFFD7CCC8))
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        viewModel.clearOrder()
+                        showClearConfirmDialog = false
+                        showOrderCalculatorDialog = false
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFB83A4B), contentColor = Color.White),
+                    modifier = Modifier.testTag("confirm_clear_order_button")
                 ) {
-                    Icon(Icons.Default.Add, contentDescription = null, tint = GoldPrimary)
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text("+ Add Chocolate Staff Noticed (AI Missed)", fontWeight = FontWeight.SemiBold)
+                    Text("Clear Order")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showClearConfirmDialog = false }) {
+                    Text("Cancel", color = GoldLight)
                 }
             }
+        )
+    }
 
-            // Summary notes from AI (if any)
-            if (notes.isNotBlank()) {
-                item {
-                    Text(
-                        text = "AI Observation: $notes",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = Color(0xFFA1887F),
-                        modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp)
-                    )
-                }
-            }
-
-            // Grand Total Card (prominent LKR display)
-            item {
-                GrandTotalCard(
-                    grandTotal = grandTotal,
-                    totalPieces = totalPieces,
-                    typesCount = typesCount,
-                    summaryText = summaryText,
-                    onSaveClick = onSaveScanClick,
-                    onDiscardClick = onRetakeClick
-                )
-            }
-        }
+    if (showReceiptDialog) {
+        OrderReceiptDialog(
+            orderNumber = orderNumber,
+            scanItems = scanItems,
+            grandTotal = viewModel.grandTotal,
+            totalPieces = viewModel.totalPieces,
+            tenderAmount = tenderAmount,
+            changeDue = viewModel.changeDue,
+            notes = notes,
+            onDismiss = { showReceiptDialog = false }
+        )
     }
 }
 
 @Composable
-private fun OrderNumberBar(
+private fun OrderHeaderBar(
     orderNumber: String,
+    grandTotal: Double,
     onEditOrderNumber: () -> Unit,
-    onNewOrderNumber: () -> Unit
+    onNewOrder: () -> Unit,
+    onOpenCalculator: () -> Unit,
+    hasItems: Boolean
 ) {
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 6.dp)
-            .testTag("order_number_card"),
-        colors = CardDefaults.cardColors(containerColor = CacaoDark),
-        shape = RoundedCornerShape(12.dp),
-        border = BorderStroke(1.dp, Brush.horizontalGradient(listOf(GoldDark.copy(alpha = 0.6f), CacaoBorder)))
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        color = CacaoDark,
+        tonalElevation = 3.dp
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 14.dp, vertical = 10.dp),
+                .padding(horizontal = 14.dp, vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.weight(1f)
+                modifier = Modifier
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(CacaoCard)
+                    .border(1.dp, GoldPrimary.copy(alpha = 0.5f), RoundedCornerShape(8.dp))
+                    .clickable { onEditOrderNumber() }
+                    .padding(horizontal = 10.dp, vertical = 6.dp)
+                    .testTag("order_number_badge")
             ) {
-                Box(
-                    modifier = Modifier
-                        .size(36.dp)
-                        .clip(CircleShape)
-                        .background(CacaoSurface)
-                        .border(1.dp, GoldPrimary.copy(alpha = 0.5f), CircleShape),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Receipt,
-                        contentDescription = "Order",
-                        tint = GoldPrimary,
-                        modifier = Modifier.size(18.dp)
-                    )
-                }
-                Spacer(modifier = Modifier.width(10.dp))
-                Column {
-                    Text(
-                        text = "ORDER REFERENCE",
-                        fontSize = 10.sp,
-                        letterSpacing = 1.sp,
-                        color = Color(0xFFBCAAA4),
-                        fontWeight = FontWeight.SemiBold
-                    )
-                    Text(
-                        text = orderNumber,
-                        fontFamily = PlayfairFontFamily,
-                        fontSize = 17.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = GoldLight
-                    )
-                }
+                Icon(
+                    imageVector = Icons.Default.Receipt,
+                    contentDescription = "Edit order number",
+                    tint = GoldPrimary,
+                    modifier = Modifier.size(16.dp)
+                )
+                Spacer(modifier = Modifier.width(6.dp))
+                Text(
+                    text = "#$orderNumber",
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 14.sp,
+                    color = GoldLight
+                )
+                Spacer(modifier = Modifier.width(4.dp))
+                Icon(
+                    imageVector = Icons.Default.Edit,
+                    contentDescription = null,
+                    tint = Color(0xFFA1887F),
+                    modifier = Modifier.size(12.dp)
+                )
             }
 
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Surface(
-                    color = CacaoSurface,
-                    shape = RoundedCornerShape(8.dp),
-                    border = BorderStroke(1.dp, GoldDark.copy(alpha = 0.8f)),
-                    modifier = Modifier
-                        .clickable(onClick = onEditOrderNumber)
-                        .testTag("edit_order_number_button")
-                ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
-                    ) {
-                        Icon(
-                            Icons.Default.Edit,
-                            contentDescription = "Edit Order",
-                            tint = GoldLight,
-                            modifier = Modifier.size(13.dp)
-                        )
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text("Edit", color = GoldLight, fontSize = 12.sp, fontWeight = FontWeight.Medium)
-                    }
-                }
-
-                Spacer(modifier = Modifier.width(8.dp))
-
-                Surface(
-                    color = CacaoSurface,
-                    shape = RoundedCornerShape(8.dp),
-                    border = BorderStroke(1.dp, CacaoBorder),
-                    modifier = Modifier
-                        .clickable(onClick = onNewOrderNumber)
-                        .testTag("new_order_number_button")
-                ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp)
-                    ) {
-                        Icon(
-                            Icons.Default.Refresh,
-                            contentDescription = "New Order #",
-                            tint = GoldPrimary,
-                            modifier = Modifier.size(13.dp)
-                        )
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text("New #", color = GoldPrimary, fontSize = 12.sp, fontWeight = FontWeight.Medium)
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun CaptureOptionsCard(
-    onCameraClick: () -> Unit,
-    onUploadClick: () -> Unit,
-    onDirectManualTallyClick: () -> Unit
-) {
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 8.dp),
-        colors = CardDefaults.cardColors(containerColor = CacaoDark),
-        shape = RoundedCornerShape(16.dp),
-        border = BorderStroke(1.dp, Brush.horizontalGradient(listOf(CacaoBorder, GoldDark.copy(alpha = 0.5f))))
-    ) {
-        Column(
-            modifier = Modifier.padding(20.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(64.dp)
-                    .clip(CircleShape)
-                    .background(Brush.radialGradient(listOf(GoldPrimary, CacaoDark))),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    imageVector = Icons.Default.CameraAlt,
-                    contentDescription = null,
-                    tint = CacaoBlack,
-                    modifier = Modifier.size(32.dp)
-                )
-            }
-            Spacer(modifier = Modifier.height(14.dp))
-            Text(
-                text = "Capture Box or Tray",
-                fontFamily = PlayfairFontFamily,
-                fontWeight = FontWeight.Bold,
-                fontSize = 20.sp,
-                color = GoldLight
-            )
-            Spacer(modifier = Modifier.height(6.dp))
-
-            // Camera Guidance Banner
-            Surface(
-                color = CacaoBlack.copy(alpha = 0.6f),
-                shape = RoundedCornerShape(8.dp),
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Row(
-                    modifier = Modifier.padding(8.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(Icons.Default.Lightbulb, contentDescription = null, tint = GoldPrimary, modifier = Modifier.size(16.dp))
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        text = "Hold camera 30cm directly above the tray. Keep in single layer.",
-                        color = Color(0xFFD7CCC8),
-                        fontSize = 11.sp
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                Button(
-                    onClick = onCameraClick,
-                    modifier = Modifier
-                        .weight(1f)
-                        .height(52.dp)
-                        .testTag("camera_scan_button"),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = GoldPrimary,
-                        contentColor = CacaoBlack
-                    ),
-                    shape = RoundedCornerShape(12.dp)
-                ) {
-                    Icon(Icons.Default.CameraAlt, contentDescription = null, modifier = Modifier.size(20.dp))
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text("Take Photo", fontWeight = FontWeight.Bold)
-                }
-
                 OutlinedButton(
-                    onClick = onUploadClick,
+                    onClick = onNewOrder,
+                    shape = RoundedCornerShape(8.dp),
+                    border = BorderStroke(1.dp, GoldDark.copy(alpha = 0.7f)),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = GoldLight),
+                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
                     modifier = Modifier
-                        .weight(1f)
-                        .height(52.dp)
-                        .testTag("upload_photo_button"),
-                    colors = ButtonDefaults.outlinedButtonColors(
-                        contentColor = GoldLight
-                    ),
-                    border = BorderStroke(1.dp, Brush.horizontalGradient(listOf(GoldPrimary, GoldDark))),
-                    shape = RoundedCornerShape(12.dp)
+                        .height(34.dp)
+                        .testTag("new_order_button")
                 ) {
-                    Icon(Icons.Default.PhotoLibrary, contentDescription = null, modifier = Modifier.size(20.dp))
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text("Upload", fontWeight = FontWeight.SemiBold)
+                    Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(14.dp))
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text("New", fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
                 }
-            }
 
-            Spacer(modifier = Modifier.height(10.dp))
-
-            OutlinedButton(
-                onClick = onDirectManualTallyClick,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(46.dp)
-                    .testTag("direct_manual_tally_button"),
-                colors = ButtonDefaults.outlinedButtonColors(
-                    contentColor = AmberCaramel
-                ),
-                border = BorderStroke(1.dp, AmberCaramel.copy(alpha = 0.8f)),
-                shape = RoundedCornerShape(12.dp)
-            ) {
-                Icon(Icons.Default.Receipt, contentDescription = null, tint = AmberCaramel, modifier = Modifier.size(18.dp))
-                Spacer(modifier = Modifier.width(8.dp))
-                Text("⚡ Fast Manual Counter (No Photo Required)", fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
-            }
-        }
-    }
-}
-
-@Composable
-private fun SampleTraySelectorSection(
-    onSelect: (SampleTrayPreset) -> Unit
-) {
-    Column(modifier = Modifier.fillMaxWidth()) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(
-                text = "Quick Test with Sample Trays",
-                fontFamily = PlayfairFontFamily,
-                fontSize = 17.sp,
-                fontWeight = FontWeight.SemiBold,
-                color = GoldLight
-            )
-            Spacer(modifier = Modifier.width(8.dp))
-            Surface(
-                color = CacaoCard,
-                shape = RoundedCornerShape(6.dp)
-            ) {
-                Text(
-                    text = "Demo Mode",
-                    color = GoldPrimary,
-                    fontSize = 10.sp,
-                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                )
-            }
-        }
-        Spacer(modifier = Modifier.height(8.dp))
-
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .horizontalScroll(rememberScrollState())
-                .padding(horizontal = 16.dp),
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            SampleTrayPresets.forEach { preset ->
-                Card(
-                    modifier = Modifier
-                        .width(220.dp)
-                        .clickable { onSelect(preset) }
-                        .testTag("sample_tray_${preset.id}"),
-                    colors = CardDefaults.cardColors(containerColor = CacaoDark),
-                    shape = RoundedCornerShape(12.dp),
-                    border = BorderStroke(1.dp, Brush.horizontalGradient(listOf(CacaoBorder, GoldDark.copy(alpha = 0.4f))))
-                ) {
-                    Column(modifier = Modifier.padding(12.dp)) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Box(
-                                modifier = Modifier
-                                    .size(24.dp)
-                                    .clip(CircleShape)
-                                    .background(preset.previewColor)
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text(
-                                text = "${preset.pieceCount} Pieces",
-                                color = GoldPrimary,
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 12.sp
-                            )
-                        }
-                        Spacer(modifier = Modifier.height(6.dp))
-                        Text(
-                            text = preset.title,
-                            color = Color.White,
-                            fontWeight = FontWeight.SemiBold,
-                            fontSize = 14.sp,
-                            maxLines = 1
-                        )
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Text(
-                            text = preset.description,
-                            color = Color(0xFFD7CCC8),
-                            fontSize = 11.sp,
-                            maxLines = 2,
-                            lineHeight = 14.sp
-                        )
+                if (hasItems) {
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Button(
+                        onClick = onOpenCalculator,
+                        colors = ButtonDefaults.buttonColors(containerColor = GoldPrimary, contentColor = CacaoBlack),
+                        shape = RoundedCornerShape(8.dp),
+                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                        modifier = Modifier
+                            .height(34.dp)
+                            .testTag("quick_view_order_button")
+                    ) {
+                        Icon(Icons.Default.Calculate, contentDescription = null, modifier = Modifier.size(15.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(formatLKR(grandTotal), fontSize = 12.sp, fontWeight = FontWeight.Bold)
                     }
                 }
             }
@@ -1254,520 +430,324 @@ private fun SampleTraySelectorSection(
 }
 
 @Composable
-private fun TrayPreviewCard(
-    bitmap: Bitmap,
-    trayTitle: String?,
-    orderNumber: String,
-    showGridOverlay: Boolean,
-    onToggleGrid: () -> Unit,
-    isAnalyzing: Boolean,
-    isResultReady: Boolean,
-    onCountClick: () -> Unit,
-    onManualTallyClick: () -> Unit,
-    onRetakeClick: () -> Unit
+private fun ProductSearchBar(
+    query: String,
+    onQueryChange: (String) -> Unit,
+    onClear: () -> Unit
 ) {
-    Card(
+    Box(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 8.dp),
-        colors = CardDefaults.cardColors(containerColor = CacaoDark),
-        shape = RoundedCornerShape(16.dp),
-        border = BorderStroke(1.dp, Brush.horizontalGradient(listOf(CacaoBorder, GoldPrimary.copy(alpha = 0.5f))))
+            .padding(horizontal = 14.dp, vertical = 6.dp)
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column {
-                    Text(
-                        text = trayTitle ?: "Captured Tray",
-                        fontFamily = PlayfairFontFamily,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 16.sp,
-                        color = GoldLight
-                    )
-                    Text(
-                        text = "Order: #$orderNumber",
-                        color = Color(0xFFD7CCC8),
-                        fontSize = 12.sp
-                    )
-                }
-
-                Row(verticalAlignment = Alignment.CenterVertically) {
+        OutlinedTextField(
+            value = query,
+            onValueChange = onQueryChange,
+            modifier = Modifier
+                .fillMaxWidth()
+                .testTag("order_search_bar"),
+            placeholder = {
+                Text(
+                    text = "Search products (e.g. 100g, slab, cake, mocha)...",
+                    color = Color(0xFF9E8E81),
+                    fontSize = 13.sp
+                )
+            },
+            leadingIcon = {
+                Icon(
+                    imageVector = Icons.Default.Search,
+                    contentDescription = "Search",
+                    tint = GoldPrimary,
+                    modifier = Modifier.size(20.dp)
+                )
+            },
+            trailingIcon = {
+                if (query.isNotEmpty()) {
                     IconButton(
-                        onClick = onToggleGrid,
-                        modifier = Modifier.testTag("toggle_camera_grid_button")
+                        onClick = onClear,
+                        modifier = Modifier.testTag("clear_order_search_button")
                     ) {
                         Icon(
-                            imageVector = Icons.Default.GridOn,
-                            contentDescription = "Toggle Grid Alignment",
-                            tint = if (showGridOverlay) GoldPrimary else Color.Gray,
-                            modifier = Modifier.size(20.dp)
-                        )
-                    }
-
-                    TextButton(
-                        onClick = onRetakeClick,
-                        enabled = !isAnalyzing,
-                        modifier = Modifier.testTag("retake_photo_button")
-                    ) {
-                        Icon(Icons.Default.Refresh, contentDescription = null, tint = GoldPrimary, modifier = Modifier.size(16.dp))
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text("Change", color = GoldPrimary, fontSize = 13.sp)
-                    }
-                }
-            }
-
-            Spacer(modifier = Modifier.height(8.dp))
-
-            // Image container with optional Framing Grid Overlay
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(220.dp)
-                    .clip(RoundedCornerShape(12.dp))
-                    .border(1.dp, CacaoBorder, RoundedCornerShape(12.dp))
-                    .background(Color.Black),
-                contentAlignment = Alignment.Center
-            ) {
-                Image(
-                    bitmap = bitmap.asImageBitmap(),
-                    contentDescription = "Tray Preview",
-                    modifier = Modifier.fillMaxSize()
-                )
-
-                // Golden 3x3 framing grid alignment lines
-                if (showGridOverlay) {
-                    Canvas(modifier = Modifier.fillMaxSize()) {
-                        val w = size.width
-                        val h = size.height
-
-                        // Rule of thirds lines
-                        val gridColor = Color(0x77FFD54F)
-                        drawLine(color = gridColor, start = Offset(w / 3f, 0f), end = Offset(w / 3f, h), strokeWidth = 1.5f)
-                        drawLine(color = gridColor, start = Offset(2f * w / 3f, 0f), end = Offset(2f * w / 3f, h), strokeWidth = 1.5f)
-                        drawLine(color = gridColor, start = Offset(0f, h / 3f), end = Offset(w, h / 3f), strokeWidth = 1.5f)
-                        drawLine(color = gridColor, start = Offset(0f, 2f * h / 3f), end = Offset(w, 2f * h / 3f), strokeWidth = 1.5f)
-
-                        // Center framing bracket
-                        val bracketColor = Color(0xAAFFD54F)
-                        val inset = 24f
-                        val bLen = 30f
-                        // Top-left
-                        drawLine(color = bracketColor, start = Offset(inset, inset), end = Offset(inset + bLen, inset), strokeWidth = 3f)
-                        drawLine(color = bracketColor, start = Offset(inset, inset), end = Offset(inset, inset + bLen), strokeWidth = 3f)
-                        // Top-right
-                        drawLine(color = bracketColor, start = Offset(w - inset, inset), end = Offset(w - inset - bLen, inset), strokeWidth = 3f)
-                        drawLine(color = bracketColor, start = Offset(w - inset, inset), end = Offset(w - inset, inset + bLen), strokeWidth = 3f)
-                        // Bottom-left
-                        drawLine(color = bracketColor, start = Offset(inset, h - inset), end = Offset(inset + bLen, h - inset), strokeWidth = 3f)
-                        drawLine(color = bracketColor, start = Offset(inset, h - inset), end = Offset(inset, h - inset - bLen), strokeWidth = 3f)
-                        // Bottom-right
-                        drawLine(color = bracketColor, start = Offset(w - inset, h - inset), end = Offset(w - inset - bLen, h - inset), strokeWidth = 3f)
-                        drawLine(color = bracketColor, start = Offset(w - inset, h - inset), end = Offset(w - inset, h - inset - bLen), strokeWidth = 3f)
-                    }
-                }
-            }
-
-            if (!isResultReady && !isAnalyzing) {
-                Spacer(modifier = Modifier.height(14.dp))
-                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Button(
-                        onClick = onCountClick,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(50.dp)
-                            .testTag("count_chocolates_button"),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = GoldPrimary,
-                            contentColor = CacaoBlack
-                        ),
-                        shape = RoundedCornerShape(12.dp)
-                    ) {
-                        Icon(Icons.Default.Star, contentDescription = null, modifier = Modifier.size(18.dp))
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            text = "Auto-Count with AI ($orderNumber)",
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 15.sp
-                        )
-                    }
-
-                    OutlinedButton(
-                        onClick = onManualTallyClick,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(48.dp)
-                            .testTag("fast_manual_tally_button"),
-                        colors = ButtonDefaults.outlinedButtonColors(contentColor = GoldLight),
-                        border = BorderStroke(1.5.dp, Brush.horizontalGradient(listOf(AmberCaramel, GoldPrimary))),
-                        shape = RoundedCornerShape(12.dp)
-                    ) {
-                        Icon(Icons.Default.Receipt, contentDescription = null, tint = AmberCaramel, modifier = Modifier.size(18.dp))
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            text = "⚡ Fast Manual Tally ($orderNumber)",
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 15.sp
+                            imageVector = Icons.Default.Clear,
+                            contentDescription = "Clear search",
+                            tint = Color(0xFFD7CCC8),
+                            modifier = Modifier.size(18.dp)
                         )
                     }
                 }
-            }
-        }
+            },
+            singleLine = true,
+            shape = RoundedCornerShape(12.dp),
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedContainerColor = CacaoDark,
+                unfocusedContainerColor = CacaoDark,
+                focusedBorderColor = GoldPrimary,
+                unfocusedBorderColor = CacaoBorder,
+                focusedTextColor = Color.White,
+                unfocusedTextColor = Color.White
+            )
+        )
     }
 }
 
 @Composable
-private fun AnalyzingProgressCard(
-    statusMessage: String,
-    onCancelOrManualTally: () -> Unit
+private fun CategoryFilterChips(
+    categories: List<String>,
+    selectedCategory: String,
+    onSelectCategory: (String) -> Unit,
+    products: List<Product>
 ) {
-    val infiniteTransition = rememberInfiniteTransition(label = "pulse")
-    val scale by infiniteTransition.animateFloat(
-        initialValue = 0.95f,
-        targetValue = 1.08f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(800),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "pulse_scale"
-    )
-
-    Card(
+    LazyRow(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(16.dp),
-        colors = CardDefaults.cardColors(containerColor = CacaoCard),
-        shape = RoundedCornerShape(16.dp)
+            .padding(vertical = 4.dp),
+        contentPadding = PaddingValues(horizontal = 14.dp),
+        horizontalArrangement = Arrangement.spacedBy(6.dp)
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(24.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(72.dp)
-                    .scale(scale)
-                    .clip(CircleShape)
-                    .background(Brush.radialGradient(listOf(GoldPrimary, CacaoDark))),
-                contentAlignment = Alignment.Center
-            ) {
-                CircularProgressIndicator(
-                    color = GoldLight,
-                    strokeWidth = 3.dp,
-                    modifier = Modifier.size(54.dp)
-                )
+        items(categories) { category ->
+            val isSelected = selectedCategory.equals(category, ignoreCase = true)
+            val count = if (category == "All") {
+                products.size
+            } else {
+                products.count { it.category.equals(category, ignoreCase = true) }
             }
-            Spacer(modifier = Modifier.height(16.dp))
-            Text(
-                text = "Counting Artisanal Chocolates...",
-                fontFamily = PlayfairFontFamily,
-                fontWeight = FontWeight.Bold,
-                fontSize = 18.sp,
-                color = GoldLight
-            )
-            Spacer(modifier = Modifier.height(6.dp))
-            Text(
-                text = statusMessage,
-                style = MaterialTheme.typography.bodyMedium,
-                color = Color(0xFFD7CCC8),
-                textAlign = TextAlign.Center
-            )
-            Spacer(modifier = Modifier.height(14.dp))
-            OutlinedButton(
-                onClick = onCancelOrManualTally,
-                colors = ButtonDefaults.outlinedButtonColors(contentColor = AmberCaramel),
-                border = BorderStroke(1.dp, AmberCaramel.copy(alpha = 0.7f)),
+
+            FilterChip(
+                selected = isSelected,
+                onClick = { onSelectCategory(category) },
+                label = {
+                    Text(
+                        text = "$category ($count)",
+                        fontSize = 12.sp,
+                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+                    )
+                },
+                leadingIcon = {
+                    if (category != "All") {
+                        Icon(
+                            imageVector = getCategoryIcon(category),
+                            contentDescription = null,
+                            modifier = Modifier.size(14.dp)
+                        )
+                    }
+                },
                 shape = RoundedCornerShape(8.dp),
-                modifier = Modifier.height(38.dp)
-            ) {
-                Icon(Icons.Default.Receipt, contentDescription = null, tint = AmberCaramel, modifier = Modifier.size(15.dp))
-                Spacer(modifier = Modifier.width(6.dp))
-                Text("Switch to Fast Manual Tally", fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
-            }
+                colors = FilterChipDefaults.filterChipColors(
+                    containerColor = CacaoDark,
+                    labelColor = Color(0xFFD7CCC8),
+                    iconColor = Color(0xFFD7CCC8),
+                    selectedContainerColor = GoldPrimary,
+                    selectedLabelColor = CacaoBlack,
+                    selectedLeadingIconColor = CacaoBlack
+                ),
+                border = BorderStroke(
+                    1.dp,
+                    if (isSelected) GoldPrimary else CacaoBorder
+                ),
+                modifier = Modifier.testTag("category_chip_$category")
+            )
         }
     }
 }
 
 @Composable
-private fun UnrecognizedAlertCard(
-    count: Int,
-    onAssignClick: () -> Unit
-) {
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 6.dp),
-        colors = CardDefaults.cardColors(containerColor = Color(0xFF3E2723)),
-        shape = RoundedCornerShape(12.dp),
-        border = BorderStroke(1.dp, Brush.horizontalGradient(listOf(AmberCaramel, GoldPrimary)))
-    ) {
-        Row(
-            modifier = Modifier
-                .padding(14.dp)
-                .fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
-        ) {
-            Row(
-                modifier = Modifier.weight(1f),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Icon(Icons.Default.Warning, contentDescription = null, tint = AmberCaramel)
-                Spacer(modifier = Modifier.width(10.dp))
-                Column {
-                    Text(
-                        text = "$count Unrecognized Piece${if (count == 1) "" else "s"}",
-                        fontWeight = FontWeight.Bold,
-                        color = GoldLight,
-                        fontSize = 14.sp
-                    )
-                    Text(
-                        text = "Partially hidden or not in catalog",
-                        color = Color(0xFFFFCC80),
-                        fontSize = 12.sp
-                    )
-                }
-            }
-            Button(
-                onClick = onAssignClick,
-                colors = ButtonDefaults.buttonColors(containerColor = AmberCaramel, contentColor = Color.White),
-                shape = RoundedCornerShape(8.dp),
-                modifier = Modifier.testTag("assign_unrecognized_button")
-            ) {
-                Text("Assign as...", fontSize = 12.sp, fontWeight = FontWeight.Bold)
-            }
-        }
-    }
-}
-
-@Composable
-private fun ScanItemRow(
-    item: ScanItem,
-    imageUri: String?,
+private fun ProductOrderRow(
+    product: Product,
+    currentCount: Int,
+    onAdd: () -> Unit,
     onIncrement: () -> Unit,
-    onDecrement: () -> Unit,
-    onDirectCountClick: () -> Unit,
-    onRemove: () -> Unit
+    onDecrement: () -> Unit
 ) {
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 4.dp),
-        colors = CardDefaults.cardColors(containerColor = if (item.count > 0) CacaoDark else CacaoDark.copy(alpha = 0.6f)),
-        shape = RoundedCornerShape(12.dp),
+            .testTag("product_row_${product.id}"),
+        colors = CardDefaults.cardColors(
+            containerColor = if (currentCount > 0) CacaoCard else CacaoDark
+        ),
+        shape = RoundedCornerShape(10.dp),
         border = BorderStroke(
             1.dp,
-            if (item.count > 0) Brush.horizontalGradient(listOf(CacaoBorder, CacaoCard)) else Brush.horizontalGradient(listOf(CacaoBorder.copy(alpha = 0.4f), CacaoBorder.copy(alpha = 0.2f)))
+            if (currentCount > 0) GoldPrimary.copy(alpha = 0.7f) else CacaoBorder.copy(alpha = 0.5f)
         )
     ) {
         Row(
             modifier = Modifier
-                .padding(horizontal = 12.dp, vertical = 10.dp)
-                .fillMaxWidth(),
+                .fillMaxWidth()
+                .padding(12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             ChocolateThumbnail(
-                shape = item.shape,
-                colorHex = item.colorHex,
-                imageUri = imageUri,
-                size = 44.dp
+                shape = product.shape,
+                colorHex = product.colorHex,
+                imageUri = product.referenceImageUri,
+                category = product.category,
+                size = 46.dp
             )
 
             Spacer(modifier = Modifier.width(12.dp))
 
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = item.productName,
-                    color = if (item.count > 0) Color.White else Color.White.copy(alpha = 0.6f),
-                    fontWeight = FontWeight.SemiBold,
-                    fontSize = 15.sp
+                    text = product.name,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 15.sp,
+                    color = Color.White,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
                 )
+
+                Spacer(modifier = Modifier.height(4.dp))
+
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    CategoryBadge(category = product.category)
+
+                    if (product.size.isNotBlank()) {
+                        SizeWeightBadge(size = product.size)
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(4.dp))
+
                 Text(
-                    text = "${formatLKR(item.unitPrice)} each",
-                    color = Color(0xFFD7CCC8),
-                    fontSize = 12.sp
+                    text = formatLKR(product.price),
+                    color = GoldLight,
+                    fontWeight = FontWeight.SemiBold,
+                    fontSize = 13.sp
                 )
             }
 
-            // Editable Quantity with large touch targets (+ / -)
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier
-                    .background(CacaoSurface, RoundedCornerShape(8.dp))
-                    .border(1.dp, CacaoBorder, RoundedCornerShape(8.dp))
-                    .padding(horizontal = 4.dp)
-            ) {
-                IconButton(
-                    onClick = onDecrement,
-                    enabled = item.count > 0,
-                    modifier = Modifier
-                        .size(44.dp)
-                        .testTag("decrement_${item.productName}")
-                ) {
-                    Icon(
-                        imageVector = if (item.count > 1) Icons.Default.Remove else if (item.count == 1) Icons.Default.DeleteOutline else Icons.Default.Remove,
-                        contentDescription = "Decrease count",
-                        tint = if (item.count > 1) GoldLight else if (item.count == 1) RubyBerryColor else Color.Gray,
-                        modifier = Modifier.size(18.dp)
-                    )
-                }
+            Spacer(modifier = Modifier.width(8.dp))
 
-                // Tap count to enter number directly
-                Text(
-                    text = "${item.count}",
-                    color = if (item.count > 0) GoldLight else Color.Gray,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 16.sp,
+            if (currentCount == 0) {
+                Button(
+                    onClick = onAdd,
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = GoldPrimary,
+                        contentColor = CacaoBlack
+                    ),
+                    shape = RoundedCornerShape(8.dp),
+                    contentPadding = PaddingValues(horizontal = 14.dp, vertical = 6.dp),
                     modifier = Modifier
-                        .clickable(onClick = onDirectCountClick)
-                        .padding(horizontal = 8.dp, vertical = 4.dp)
-                        .testTag("count_display_${item.productName}")
-                )
-
-                IconButton(
-                    onClick = onIncrement,
-                    modifier = Modifier
-                        .size(44.dp)
-                        .testTag("increment_${item.productName}")
+                        .height(38.dp)
+                        .testTag("add_button_${product.id}")
                 ) {
                     Icon(
                         imageVector = Icons.Default.Add,
-                        contentDescription = "Increase count",
-                        tint = GoldPrimary,
-                        modifier = Modifier.size(18.dp)
+                        contentDescription = null,
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text("Add", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                }
+            } else {
+                Column(horizontalAlignment = Alignment.End) {
+                    QuantityStepper(
+                        quantity = currentCount,
+                        onIncrement = onIncrement,
+                        onDecrement = onDecrement,
+                        testTagPrefix = "product_${product.id}"
+                    )
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Text(
+                        text = "Total: ${formatLKR(product.price * currentCount)}",
+                        color = GoldLight,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Medium
                     )
                 }
-            }
-
-            Spacer(modifier = Modifier.width(12.dp))
-
-            // Calculated line total (computed by app code)
-            Column(horizontalAlignment = Alignment.End) {
-                Text(
-                    text = formatLKR(item.lineTotal),
-                    color = if (item.count > 0) GoldLight else Color.Gray,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 14.sp
-                )
             }
         }
     }
 }
 
 @Composable
-private fun GrandTotalCard(
-    grandTotal: Double,
+private fun BottomOrderSummaryBar(
+    orderNumber: String,
     totalPieces: Int,
     typesCount: Int,
-    summaryText: String,
-    onSaveClick: () -> Unit,
-    onDiscardClick: () -> Unit
+    grandTotal: Double,
+    onOpenCalculator: () -> Unit
 ) {
-    Card(
+    Surface(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(16.dp),
-        colors = CardDefaults.cardColors(containerColor = CacaoCard),
-        shape = RoundedCornerShape(16.dp),
-        border = BorderStroke(1.dp, Brush.horizontalGradient(listOf(GoldDark, GoldLight)))
+            .testTag("bottom_order_summary_bar"),
+        color = CacaoCard,
+        shadowElevation = 8.dp,
+        border = BorderStroke(1.dp, GoldPrimary.copy(alpha = 0.5f))
     ) {
-        Column(modifier = Modifier.padding(20.dp)) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = "GRAND TOTAL",
-                    fontFamily = PlayfairFontFamily,
-                    fontSize = 14.sp,
-                    letterSpacing = 1.sp,
-                    color = Color(0xFFD7CCC8),
-                    fontWeight = FontWeight.SemiBold
-                )
-                Surface(
-                    color = CacaoSurface,
-                    shape = RoundedCornerShape(8.dp),
-                    border = BorderStroke(1.dp, CacaoBorder)
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(
+                    modifier = Modifier
+                        .size(38.dp)
+                        .background(GoldPrimary.copy(alpha = 0.15f), CircleShape)
+                        .border(1.dp, GoldPrimary, CircleShape),
+                    contentAlignment = Alignment.Center
                 ) {
+                    Icon(
+                        imageVector = Icons.Default.ShoppingBag,
+                        contentDescription = null,
+                        tint = GoldPrimary,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+                Spacer(modifier = Modifier.width(10.dp))
+                Column {
                     Text(
-                        text = "$totalPieces pieces • $typesCount types",
-                        color = GoldLight,
-                        fontSize = 12.sp,
+                        text = "Order #$orderNumber",
+                        color = Color.White,
                         fontWeight = FontWeight.Bold,
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                        fontSize = 14.sp
+                    )
+                    Text(
+                        text = "$totalPieces pcs ($typesCount types)",
+                        color = Color(0xFFC7B299),
+                        fontSize = 12.sp
                     )
                 }
             }
 
-            Spacer(modifier = Modifier.height(8.dp))
-
-            // Prominent Grand Total in LKR
-            Text(
-                text = formatLKR(grandTotal),
-                fontFamily = PlayfairFontFamily,
-                fontWeight = FontWeight.Bold,
-                fontSize = 32.sp,
-                color = GoldPrimary,
-                modifier = Modifier.testTag("grand_total_text")
-            )
-
-            Spacer(modifier = Modifier.height(6.dp))
-
-            // Auto-generated human readable summary line
-            Surface(
-                color = CacaoBlack.copy(alpha = 0.5f),
-                shape = RoundedCornerShape(8.dp),
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Text(
-                    text = summaryText,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = Color(0xFFE0E0E0),
-                    modifier = Modifier.padding(10.dp)
-                )
-            }
-
-            Spacer(modifier = Modifier.height(18.dp))
-
-            // Save / Discard Actions
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                OutlinedButton(
-                    onClick = onDiscardClick,
-                    modifier = Modifier
-                        .weight(1f)
-                        .height(50.dp)
-                        .testTag("discard_scan_button"),
-                    colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFFFFCDD2)),
-                    border = BorderStroke(1.dp, Brush.horizontalGradient(listOf(RubyBerryColor, CacaoBorder))),
-                    shape = RoundedCornerShape(12.dp)
-                ) {
-                    Text("Discard", fontWeight = FontWeight.SemiBold)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(horizontalAlignment = Alignment.End) {
+                    Text(
+                        text = "Total",
+                        color = Color(0xFFA1887F),
+                        fontSize = 10.sp
+                    )
+                    Text(
+                        text = formatLKR(grandTotal),
+                        color = GoldLight,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 16.sp
+                    )
                 }
-
+                Spacer(modifier = Modifier.width(12.dp))
                 Button(
-                    onClick = onSaveClick,
-                    modifier = Modifier
-                        .weight(1.4f)
-                        .height(50.dp)
-                        .testTag("save_scan_button"),
+                    onClick = onOpenCalculator,
                     colors = ButtonDefaults.buttonColors(
                         containerColor = GoldPrimary,
                         contentColor = CacaoBlack
                     ),
-                    shape = RoundedCornerShape(12.dp)
+                    shape = RoundedCornerShape(8.dp),
+                    contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp),
+                    modifier = Modifier
+                        .height(40.dp)
+                        .testTag("open_order_calculator_button")
                 ) {
-                    Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Icon(Icons.Default.Calculate, contentDescription = null, modifier = Modifier.size(16.dp))
                     Spacer(modifier = Modifier.width(6.dp))
-                    Text("Save to History", fontWeight = FontWeight.Bold)
+                    Text("Calculator", fontWeight = FontWeight.Bold, fontSize = 13.sp)
                 }
             }
         }

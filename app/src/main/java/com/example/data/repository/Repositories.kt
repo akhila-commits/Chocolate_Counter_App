@@ -14,26 +14,36 @@ class ProductRepository(private val productDao: ProductDao) {
 
     suspend fun addProduct(
         name: String,
+        category: String = "Chocolate pieces",
+        size: String = "",
         price: Double,
-        description: String,
-        shape: String,
-        colorHex: String,
+        description: String = "",
+        shape: String = "Piece",
+        colorHex: String = "#3B1E15",
         referenceImageUri: String? = null
     ): Result<Long> {
-        val trimmed = name.trim()
-        if (trimmed.isEmpty()) {
+        val trimmedName = name.trim()
+        val trimmedSize = size.trim()
+        val trimmedCategory = category.trim().ifEmpty { "Chocolate pieces" }
+
+        if (trimmedName.isEmpty()) {
             return Result.failure(IllegalArgumentException("Product name cannot be empty"))
         }
         if (price <= 0) {
             return Result.failure(IllegalArgumentException("Price must be a positive number (LKR)"))
         }
-        val existing = productDao.getProductByName(trimmed)
+
+        // Allow products with the same name if their size/grammes differs
+        val existing = productDao.getProductByNameAndSize(trimmedName, trimmedSize)
         if (existing != null) {
-            return Result.failure(IllegalArgumentException("A chocolate with name '$trimmed' already exists"))
+            val label = if (trimmedSize.isNotEmpty()) "'$trimmedName ($trimmedSize)'" else "'$trimmedName'"
+            return Result.failure(IllegalArgumentException("A product with name and size $label already exists"))
         }
 
         val product = Product(
-            name = trimmed,
+            name = trimmedName,
+            category = trimmedCategory,
+            size = trimmedSize,
             price = price,
             description = description.trim(),
             shape = shape,
@@ -46,18 +56,30 @@ class ProductRepository(private val productDao: ProductDao) {
     }
 
     suspend fun updateProduct(product: Product): Result<Unit> {
-        val trimmed = product.name.trim()
-        if (trimmed.isEmpty()) {
+        val trimmedName = product.name.trim()
+        val trimmedSize = product.size.trim()
+        val trimmedCategory = product.category.trim().ifEmpty { "Chocolate pieces" }
+
+        if (trimmedName.isEmpty()) {
             return Result.failure(IllegalArgumentException("Product name cannot be empty"))
         }
         if (product.price <= 0) {
             return Result.failure(IllegalArgumentException("Price must be a positive number (LKR)"))
         }
-        val existing = productDao.getProductByName(trimmed)
+
+        val existing = productDao.getProductByNameAndSize(trimmedName, trimmedSize)
         if (existing != null && existing.id != product.id) {
-            return Result.failure(IllegalArgumentException("Another chocolate with name '$trimmed' already exists"))
+            val label = if (trimmedSize.isNotEmpty()) "'$trimmedName ($trimmedSize)'" else "'$trimmedName'"
+            return Result.failure(IllegalArgumentException("Another product with $label already exists"))
         }
-        productDao.updateProduct(product.copy(name = trimmed))
+
+        productDao.updateProduct(
+            product.copy(
+                name = trimmedName,
+                size = trimmedSize,
+                category = trimmedCategory
+            )
+        )
         return Result.success(Unit)
     }
 
@@ -99,7 +121,6 @@ class ScanRepository(private val scanRecordDao: ScanRecordDao) {
         val existing = if (record.orderNumber.isNotBlank()) {
             scanRecordDao.getScanRecordByOrderNumberSingle(record.orderNumber)
         } else null
-
         return if (existing != null && record.id == 0L) {
             val updated = record.copy(id = existing.id)
             scanRecordDao.insertScanRecord(updated)

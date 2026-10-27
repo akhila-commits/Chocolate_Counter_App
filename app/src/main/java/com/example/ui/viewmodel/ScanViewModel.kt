@@ -1,17 +1,15 @@
 package com.example.ui.viewmodel
 
 import android.app.Application
-import android.graphics.Bitmap
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.data.local.AppDatabase
 import com.example.data.model.Product
 import com.example.data.model.ScanItem
 import com.example.data.model.ScanRecord
-import com.example.data.remote.GeminiVisionService
 import com.example.data.repository.ProductRepository
 import com.example.data.repository.ScanRepository
-import com.example.util.ImageStorageUtil
+import com.example.ui.components.formatLKR
 import com.squareup.moshi.Moshi
 import com.squareup.moshi.Types
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -24,56 +22,42 @@ import kotlinx.coroutines.launch
 import java.text.NumberFormat
 import java.util.Locale
 
-sealed interface ScanUiState {
-    data object Idle : ScanUiState
-    data class Analyzing(val statusMessage: String) : ScanUiState
-    data class ResultReady(val summary: String) : ScanUiState
-    data class Error(val message: String) : ScanUiState
-}
-
 class ScanViewModel(application: Application) : AndroidViewModel(application) {
     private val database = AppDatabase.getDatabase(application, viewModelScope)
     private val productRepository = ProductRepository(database.productDao())
     private val scanRepository = ScanRepository(database.scanRecordDao())
-    private val visionService = GeminiVisionService()
 
     private val moshi = Moshi.Builder().build()
     private val scanItemListType = Types.newParameterizedType(List::class.java, ScanItem::class.java)
     private val scanItemAdapter = moshi.adapter<List<ScanItem>>(scanItemListType)
 
-    private val _uiState = MutableStateFlow<ScanUiState>(ScanUiState.Idle)
-    val uiState: StateFlow<ScanUiState> = _uiState.asStateFlow()
-
-    private val _selectedBitmap = MutableStateFlow<Bitmap?>(null)
-    val selectedBitmap: StateFlow<Bitmap?> = _selectedBitmap.asStateFlow()
-
-    private val _sampleTrayTitle = MutableStateFlow<String?>(null)
-    val sampleTrayTitle: StateFlow<String?> = _sampleTrayTitle.asStateFlow()
-
-    // Order reference number for the tray tally
+    // Order reference number
     private val _orderNumber = MutableStateFlow(generateDefaultOrderNumber())
     val orderNumber: StateFlow<String> = _orderNumber.asStateFlow()
 
-    // Enhanced camera framing grid overlay
-    private val _showGridOverlay = MutableStateFlow(true)
-    val showGridOverlay: StateFlow<Boolean> = _showGridOverlay.asStateFlow()
+    // Search and category filter for fast ordering
+    private val _searchQuery = MutableStateFlow("")
+    val searchQuery: StateFlow<String> = _searchQuery.asStateFlow()
 
+    private val _selectedCategory = MutableStateFlow<String?>("All")
+    val selectedCategory: StateFlow<String?> = _selectedCategory.asStateFlow()
+
+    // Current order line items
     private val _scanItems = MutableStateFlow<List<ScanItem>>(emptyList())
     val scanItems: StateFlow<List<ScanItem>> = _scanItems.asStateFlow()
 
-    private val _unrecognizedCount = MutableStateFlow(0)
-    val unrecognizedCount: StateFlow<Int> = _unrecognizedCount.asStateFlow()
+    // Cash Tender for Change Due calculation
+    private val _tenderAmount = MutableStateFlow<Double?>(null)
+    val tenderAmount: StateFlow<Double?> = _tenderAmount.asStateFlow()
 
+    // Customer or order notes
     private val _notes = MutableStateFlow("")
     val notes: StateFlow<String> = _notes.asStateFlow()
-
-    private val _customApiKey = MutableStateFlow("")
-    val customApiKey: StateFlow<String> = _customApiKey.asStateFlow()
 
     private val _toastEvent = MutableSharedFlow<String>()
     val toastEvent: SharedFlow<String> = _toastEvent.asSharedFlow()
 
-    // Price math is always calculated in app code
+    // Math calculations performed strictly in app code
     val grandTotal: Double
         get() = _scanItems.value.sumOf { it.count * it.unitPrice }
 
@@ -82,6 +66,20 @@ class ScanViewModel(application: Application) : AndroidViewModel(application) {
 
     val typesCount: Int
         get() = _scanItems.value.count { it.count > 0 }
+
+    val changeDue: Double
+        get() {
+            val tender = _tenderAmount.value ?: return 0.0
+            return (tender - grandTotal).coerceAtLeast(0.0)
+        }
+
+    fun onSearchQueryChanged(newQuery: String) {
+        _searchQuery.value = newQuery
+    }
+
+    fun onCategorySelected(category: String?) {
+        _selectedCategory.value = category ?: "All"
+    }
 
     fun setOrderNumber(number: String) {
         val trimmed = number.trim()
@@ -97,306 +95,174 @@ class ScanViewModel(application: Application) : AndroidViewModel(application) {
         return "ORD-$randomDigits"
     }
 
-    fun toggleGridOverlay() {
-        _showGridOverlay.value = !_showGridOverlay.value
+    fun setTenderAmount(amount: Double?) {
+        _tenderAmount.value = amount
     }
 
-    fun setCustomApiKey(key: String) {
-        _customApiKey.value = key.trim()
+    fun setNotes(newNotes: String) {
+        _notes.value = newNotes
     }
 
-    fun onImageSelected(bitmap: Bitmap, trayTitle: String? = null, specificOrderNumber: String? = null) {
-        _selectedBitmap.value = bitmap
-        _sampleTrayTitle.value = trayTitle
-        if (specificOrderNumber != null && specificOrderNumber.isNotBlank()) {
-            _orderNumber.value = specificOrderNumber
-        }
-        _uiState.value = ScanUiState.Idle
-        _scanItems.value = emptyList()
-        _unrecognizedCount.value = 0
-        _notes.value = ""
-    }
-
-    fun startRecognition() {
-        val bitmap = _selectedBitmap.value ?: return
-        viewModelScope.launch {
-            _uiState.value = ScanUiState.Analyzing("Connecting to Gemini Vision...")
-            val catalog = productRepository.getProductList()
-            if (catalog.isEmpty()) {
-                _uiState.value = ScanUiState.Error("Product catalog is empty. Please add products first.")
-                return@launch
-            }
-
-            _uiState.value = ScanUiState.Analyzing("Analyzing tray for Order #${_orderNumber.value}...")
-            val result = visionService.recognizeChocolates(
-                bitmap = bitmap,
-                catalog = catalog,
-                customApiKey = _customApiKey.value.takeIf { it.isNotEmpty() }
-            )
-
-            result.onSuccess { rec ->
-                // Map detected items to current catalog snapshots
-                val lineItems = mutableListOf<ScanItem>()
-                rec.items.forEach { detected ->
-                    val matchedProduct = catalog.find { it.name.equals(detected.productName, ignoreCase = true) }
-                    if (matchedProduct != null && detected.count > 0) {
-                        lineItems.add(
-                            ScanItem(
-                                productName = matchedProduct.name,
-                                unitPrice = matchedProduct.price,
-                                count = detected.count,
-                                confidence = detected.confidence,
-                                shape = matchedProduct.shape,
-                                colorHex = matchedProduct.colorHex
-                            )
-                        )
-                    }
-                }
-
-                _scanItems.value = lineItems
-                _unrecognizedCount.value = rec.unrecognizedCount
-                _notes.value = rec.notes
-                val summary = generateSummaryText()
-                _uiState.value = ScanUiState.ResultReady(summary)
-            }.onFailure { err ->
-                _uiState.value = ScanUiState.Error(err.localizedMessage ?: "Recognition failed. Please check connection.")
-            }
-        }
-    }
-
-    fun startManualTally() {
-        viewModelScope.launch {
-            val catalog = productRepository.getProductList()
-            if (catalog.isEmpty()) {
-                _uiState.value = ScanUiState.Error("Product catalog is empty. Please add products first.")
-                return@launch
-            }
-
-            val current = _scanItems.value.toMutableList()
-            if (current.isEmpty()) {
-                // Initialize catalog products ready for counting
-                val initialItems = catalog.map { product ->
-                    ScanItem(
-                        productName = product.name,
-                        unitPrice = product.price,
-                        count = 0,
-                        confidence = 1.0,
-                        shape = product.shape,
-                        colorHex = product.colorHex
-                    )
-                }
-                _scanItems.value = initialItems
-            }
-            _unrecognizedCount.value = 0
-            _notes.value = "Fast Counter Tally for Order #${_orderNumber.value}"
-            val summary = generateSummaryText()
-            _uiState.value = ScanUiState.ResultReady(summary)
-        }
-    }
-
-    fun runSimulatedRecognition() {
-        viewModelScope.launch {
-            _uiState.value = ScanUiState.Analyzing("Simulating tray counter...")
-            val catalog = productRepository.getProductList()
-            if (catalog.isEmpty()) {
-                _uiState.value = ScanUiState.Error("Product catalog is empty. Please add products first.")
-                return@launch
-            }
-
-            val rec = visionService.simulateTrayRecognition(catalog)
-            val lineItems = mutableListOf<ScanItem>()
-            rec.items.forEach { detected ->
-                val matchedProduct = catalog.find { it.name.equals(detected.productName, ignoreCase = true) }
-                if (matchedProduct != null && detected.count > 0) {
-                    lineItems.add(
-                        ScanItem(
-                            productName = matchedProduct.name,
-                            unitPrice = matchedProduct.price,
-                            count = detected.count,
-                            confidence = detected.confidence,
-                            shape = matchedProduct.shape,
-                            colorHex = matchedProduct.colorHex
-                        )
-                    )
-                }
-            }
-
-            _scanItems.value = lineItems
-            _unrecognizedCount.value = rec.unrecognizedCount
-            _notes.value = rec.notes
-            val summary = generateSummaryText()
-            _uiState.value = ScanUiState.ResultReady(summary)
-        }
-    }
-
-    fun incrementCount(productName: String) {
+    /**
+     * Add product to current order.
+     * Identifies items by product id or matching name AND size,
+     * so products with the same name but different grammes (e.g. 100g vs 250g)
+     * are treated as distinct line items!
+     */
+    fun addProductToOrder(product: Product, quantity: Int = 1) {
         val current = _scanItems.value.toMutableList()
-        val index = current.indexOfFirst { it.productName == productName }
+        val index = current.indexOfFirst {
+            (it.productId != 0L && it.productId == product.id) ||
+            (it.productName.equals(product.name, ignoreCase = true) && it.size.equals(product.size, ignoreCase = true))
+        }
+
+        if (index != -1) {
+            val existing = current[index]
+            current[index] = existing.copy(count = existing.count + quantity)
+        } else {
+            current.add(
+                ScanItem(
+                    productId = product.id,
+                    productName = product.name,
+                    category = product.category,
+                    size = product.size,
+                    unitPrice = product.price,
+                    count = quantity,
+                    confidence = 1.0,
+                    shape = product.shape,
+                    colorHex = product.colorHex
+                )
+            )
+        }
+
+        _scanItems.value = current
+        viewModelScope.launch {
+            _toastEvent.emit("Added ${product.displayTitle} to #${_orderNumber.value}")
+        }
+    }
+
+    fun getItemCountForProduct(product: Product): Int {
+        return _scanItems.value.firstOrNull {
+            (it.productId != 0L && it.productId == product.id) ||
+            (it.productName.equals(product.name, ignoreCase = true) && it.size.equals(product.size, ignoreCase = true))
+        }?.count ?: 0
+    }
+
+    fun incrementCount(item: ScanItem) {
+        val current = _scanItems.value.toMutableList()
+        val index = current.indexOfFirst { it.itemKey == item.itemKey }
         if (index != -1) {
             val old = current[index]
             current[index] = old.copy(count = old.count + 1)
             _scanItems.value = current
-            updateSummaryState()
         }
     }
 
-    fun decrementCount(productName: String) {
+    fun decrementCount(item: ScanItem) {
         val current = _scanItems.value.toMutableList()
-        val index = current.indexOfFirst { it.productName == productName }
+        val index = current.indexOfFirst { it.itemKey == item.itemKey }
         if (index != -1) {
             val old = current[index]
-            if (old.count > 0) {
+            if (old.count > 1) {
                 current[index] = old.copy(count = old.count - 1)
                 _scanItems.value = current
-                updateSummaryState()
-            }
-        }
-    }
-
-    fun setCount(productName: String, newCount: Int) {
-        val current = _scanItems.value.toMutableList()
-        val index = current.indexOfFirst { it.productName == productName }
-        if (index != -1) {
-            if (newCount > 0) {
-                val old = current[index]
-                current[index] = old.copy(count = newCount)
             } else {
                 current.removeAt(index)
+                _scanItems.value = current
+            }
+        }
+    }
+
+    fun setItemQuantity(item: ScanItem, quantity: Int) {
+        val current = _scanItems.value.toMutableList()
+        val index = current.indexOfFirst { it.itemKey == item.itemKey }
+        if (index != -1) {
+            if (quantity <= 0) {
+                current.removeAt(index)
+            } else {
+                current[index] = current[index].copy(count = quantity)
             }
             _scanItems.value = current
-            updateSummaryState()
         }
     }
 
-    fun assignUnrecognizedToProduct(product: Product, quantityToAssign: Int) {
-        val qty = quantityToAssign.coerceIn(1, _unrecognizedCount.value)
+    fun removeLineItem(item: ScanItem) {
         val current = _scanItems.value.toMutableList()
-        val index = current.indexOfFirst { it.productName.equals(product.name, ignoreCase = true) }
-
-        if (index != -1) {
-            val old = current[index]
-            current[index] = old.copy(count = old.count + qty)
-        } else {
-            current.add(
-                ScanItem(
-                    productName = product.name,
-                    unitPrice = product.price,
-                    count = qty,
-                    confidence = 1.0,
-                    shape = product.shape,
-                    colorHex = product.colorHex
-                )
-            )
-        }
-
+        current.removeAll { it.itemKey == item.itemKey }
         _scanItems.value = current
-        _unrecognizedCount.value = (_unrecognizedCount.value - qty).coerceAtLeast(0)
-        updateSummaryState()
     }
 
-    fun addMissedProduct(product: Product) {
-        val current = _scanItems.value.toMutableList()
-        val index = current.indexOfFirst { it.productName.equals(product.name, ignoreCase = true) }
-
-        if (index != -1) {
-            val old = current[index]
-            current[index] = old.copy(count = old.count + 1)
-        } else {
-            current.add(
-                ScanItem(
-                    productName = product.name,
-                    unitPrice = product.price,
-                    count = 1,
-                    confidence = 1.0,
-                    shape = product.shape,
-                    colorHex = product.colorHex
-                )
-            )
-        }
-        _scanItems.value = current
-        updateSummaryState()
-    }
-
-    fun removeLineItem(productName: String) {
-        val current = _scanItems.value.toMutableList()
-        current.removeAll { it.productName == productName }
-        _scanItems.value = current
-        updateSummaryState()
-    }
-
-    private fun updateSummaryState() {
-        if (_uiState.value is ScanUiState.ResultReady) {
-            _uiState.value = ScanUiState.ResultReady(generateSummaryText())
-        }
-    }
-
-    fun generateSummaryText(): String {
-        val pieces = totalPieces
-        val types = typesCount
-        val total = grandTotal
-        val formatted = formatLKR(total)
-        val order = _orderNumber.value
-        return if (pieces > 0) {
-            "[Order #$order] $pieces piece${if (pieces == 1) "" else "s"} across $types type${if (types == 1) "" else "s"}. Total: $formatted"
-        } else {
-            "0 pieces counted. Total: LKR 0.00"
-        }
-    }
-
-    fun saveCurrentScan(onSuccess: () -> Unit) {
-        val itemsToSave = _scanItems.value.filter { it.count > 0 }
-        if (itemsToSave.isEmpty()) {
-            viewModelScope.launch {
-                _toastEvent.emit("Please add at least 1 chocolate piece before saving Order #${_orderNumber.value}")
-            }
-            return
-        }
-        viewModelScope.launch {
-            try {
-                val bitmap = _selectedBitmap.value
-                val savedPhotoPath = bitmap?.let {
-                    ImageStorageUtil.saveBitmapToInternalStorage(getApplication(), it, "tray_scans")
-                }
-
-                val currentOrderNum = _orderNumber.value
-                val jsonString = scanItemAdapter.toJson(itemsToSave)
-                val summary = generateSummaryText()
-                val record = ScanRecord(
-                    orderNumber = currentOrderNum,
-                    photoUri = savedPhotoPath,
-                    sampleTrayTitle = _sampleTrayTitle.value,
-                    totalAmount = grandTotal,
-                    totalPieces = totalPieces,
-                    typesCount = typesCount,
-                    summaryText = summary,
-                    itemsJson = jsonString,
-                    notes = _notes.value
-                )
-                scanRepository.saveScan(record)
-                _toastEvent.emit("Order #$currentOrderNum tally saved successfully!")
-                // Automatically generate next order number for the next tray
-                generateNewOrderNumber()
-                onSuccess()
-            } catch (e: Exception) {
-                _toastEvent.emit("Failed to save: ${e.message}")
-            }
-        }
+    fun clearOrder() {
+        _scanItems.value = emptyList()
+        _tenderAmount.value = null
+        _notes.value = ""
     }
 
     fun resetScan() {
-        _selectedBitmap.value = null
-        _sampleTrayTitle.value = null
-        _scanItems.value = emptyList()
-        _unrecognizedCount.value = 0
-        _notes.value = ""
-        _uiState.value = ScanUiState.Idle
+        clearOrder()
     }
-}
 
-fun formatLKR(amount: Double): String {
-    val formatter = NumberFormat.getNumberInstance(Locale.US).apply {
-        minimumFractionDigits = 2
-        maximumFractionDigits = 2
+    fun generateSummaryText(): String {
+        val total = grandTotal
+        val count = totalPieces
+        val types = typesCount
+        val formatter = NumberFormat.getNumberInstance(Locale.US).apply {
+            minimumFractionDigits = 2
+            maximumFractionDigits = 2
+        }
+        return "$count items ($types types) for Order #${_orderNumber.value}. Total: LKR ${formatter.format(total)}"
     }
-    return "LKR ${formatter.format(amount)}"
+
+    fun saveCurrentScan(onSaved: () -> Unit) {
+        val itemsToSave = _scanItems.value.filter { it.count > 0 }
+        if (itemsToSave.isEmpty()) {
+            viewModelScope.launch {
+                _toastEvent.emit("Cannot save an empty order. Please add products.")
+            }
+            return
+        }
+
+        val total = grandTotal
+        val pieces = totalPieces
+        val types = typesCount
+        val summary = generateSummaryText()
+        val json = runCatching { scanItemAdapter.toJson(itemsToSave) }.getOrDefault("[]")
+        val savedOrderNumber = _orderNumber.value
+
+        viewModelScope.launch {
+            val record = ScanRecord(
+                orderNumber = savedOrderNumber,
+                photoUri = null,
+                sampleTrayTitle = "Counter Order",
+                totalAmount = total,
+                totalPieces = pieces,
+                typesCount = types,
+                summaryText = summary,
+                itemsJson = json,
+                notes = _notes.value
+            )
+            scanRepository.saveScan(record)
+            _toastEvent.emit("Order #$savedOrderNumber saved successfully (${formatLKR(total)})")
+
+            // Prepare next order
+            clearOrder()
+            generateNewOrderNumber()
+            onSaved()
+        }
+    }
+
+    fun loadSavedOrder(record: ScanRecord) {
+        val items = runCatching {
+            scanItemAdapter.fromJson(record.itemsJson)
+        }.getOrNull() ?: emptyList()
+
+        _orderNumber.value = record.orderNumber.ifBlank { generateDefaultOrderNumber() }
+        _scanItems.value = items
+        _notes.value = record.notes
+        _tenderAmount.value = null
+
+        viewModelScope.launch {
+            _toastEvent.emit("Loaded Order #${_orderNumber.value} into calculator")
+        }
+    }
 }

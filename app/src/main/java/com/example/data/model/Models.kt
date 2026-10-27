@@ -4,31 +4,56 @@ import androidx.room.Entity
 import androidx.room.PrimaryKey
 import com.squareup.moshi.JsonClass
 
+val PRODUCT_CATEGORIES = listOf(
+    "Chocolate pieces",
+    "Beverages",
+    "Slabs",
+    "Gift boxes",
+    "Assortment packs",
+    "Cakes",
+    "Savory Items",
+    "Ice cream"
+)
+
 @Entity(tableName = "products")
 data class Product(
     @PrimaryKey(autoGenerate = true)
     val id: Long = 0,
     val name: String,
-    val price: Double, // Price per piece in LKR
-    val description: String, // Visual cues for staff and AI recognition
-    val shape: String = "Truffle", // Truffle, Dome, Square, Heart, Rocher, Cube
+    val category: String = "Chocolate pieces",
+    val size: String = "", // e.g. "100g", "250g", "500g", "1 Pc", "Regular", "Large"
+    val price: Double, // Price in LKR
+    val description: String = "",
+    val shape: String = "Piece", // For visual icon/thumbnail
     val colorHex: String = "#3B1E15",
     val referenceImageUri: String? = null,
     val isDefault: Boolean = false,
     val createdAt: Long = System.currentTimeMillis()
-)
+) {
+    val displayTitle: String
+        get() = if (size.isNotBlank()) "$name ($size)" else name
+}
 
 @JsonClass(generateAdapter = true)
 data class ScanItem(
     val productName: String,
-    val unitPrice: Double, // Snapshot of unit price at scan time
+    val unitPrice: Double, // Snapshot of unit price at order time
     val count: Int,
-    val confidence: Double = 0.9,
-    val shape: String = "Truffle",
+    val category: String = "Chocolate pieces",
+    val size: String = "", // e.g. "100g", "250g"
+    val productId: Long = 0,
+    val confidence: Double = 1.0,
+    val shape: String = "Piece",
     val colorHex: String = "#3B1E15"
 ) {
     val lineTotal: Double
         get() = count * unitPrice
+
+    val itemKey: String
+        get() = if (size.isNotBlank()) "$productName-$size" else productName
+
+    val displayName: String
+        get() = if (size.isNotBlank()) "$productName ($size)" else productName
 }
 
 @Entity(tableName = "scan_records")
@@ -39,7 +64,7 @@ data class ScanRecord(
     val orderNumber: String = "",
     val photoUri: String? = null,
     val sampleTrayTitle: String? = null,
-    val totalAmount: Double, // Total price in LKR calculated in app code
+    val totalAmount: Double, // Total price in LKR
     val totalPieces: Int,
     val typesCount: Int,
     val summaryText: String,
@@ -50,7 +75,7 @@ data class ScanRecord(
 data class DetectedItem(
     val productName: String,
     val count: Int,
-    val confidence: Double = 0.85
+    val confidence: Double = 1.0
 )
 
 data class RecognitionResult(

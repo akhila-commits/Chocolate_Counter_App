@@ -17,9 +17,9 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.CameraAlt
-import androidx.compose.material.icons.filled.Category
-import androidx.compose.material.icons.filled.History
+import androidx.compose.material.icons.filled.Calculate
+import androidx.compose.material.icons.filled.Inventory2
+import androidx.compose.material.icons.filled.ReceiptLong
 import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
@@ -43,7 +43,6 @@ import com.example.ui.screens.catalog.CatalogScreen
 import com.example.ui.screens.history.HistoryScreen
 import com.example.ui.screens.scan.ScanScreen
 import com.example.ui.theme.CacaoBlack
-import com.example.ui.theme.CacaoCard
 import com.example.ui.theme.CacaoDark
 import com.example.ui.theme.GoldDark
 import com.example.ui.theme.GoldLight
@@ -58,9 +57,9 @@ enum class AppDestination(
     val icon: ImageVector,
     val testTag: String
 ) {
-    SCAN("Counter Scan", Icons.Default.CameraAlt, "nav_scan"),
-    CATALOG("Catalog", Icons.Default.Category, "nav_catalog"),
-    HISTORY("History", Icons.Default.History, "nav_history")
+    ORDER("Order Calculator", Icons.Default.Calculate, "nav_scan"),
+    CATALOG("Catalog", Icons.Default.Inventory2, "nav_catalog"),
+    HISTORY("Order History", Icons.Default.ReceiptLong, "nav_history")
 }
 
 class MainActivity : ComponentActivity() {
@@ -71,7 +70,6 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
-
         setContent {
             MyApplicationTheme {
                 MainAppScreen(
@@ -90,13 +88,13 @@ fun MainAppScreen(
     catalogViewModel: CatalogViewModel,
     historyViewModel: HistoryViewModel
 ) {
-    var currentDestination by rememberSaveable { mutableStateOf(AppDestination.SCAN) }
+    var currentDestination by rememberSaveable { mutableStateOf(AppDestination.ORDER) }
     val catalogProducts by catalogViewModel.allProducts.collectAsStateWithLifecycle()
 
     // Handle back button on secondary screens
-    if (currentDestination != AppDestination.SCAN) {
+    if (currentDestination != AppDestination.ORDER) {
         BackHandler {
-            currentDestination = AppDestination.SCAN
+            currentDestination = AppDestination.ORDER
         }
     }
 
@@ -151,7 +149,7 @@ fun MainAppScreen(
                 .padding(innerPadding)
         ) { destination ->
             when (destination) {
-                AppDestination.SCAN -> ScanScreen(
+                AppDestination.ORDER -> ScanScreen(
                     viewModel = scanViewModel,
                     catalogProducts = catalogProducts
                 )

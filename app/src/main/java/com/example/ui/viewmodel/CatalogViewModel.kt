@@ -4,8 +4,10 @@ import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.data.local.AppDatabase
+import com.example.data.model.PRODUCT_CATEGORIES
 import com.example.data.model.Product
 import com.example.data.repository.ProductRepository
+import com.example.ui.components.formatLKR
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -31,19 +33,34 @@ class CatalogViewModel(application: Application) : AndroidViewModel(application)
     private val _searchQuery = MutableStateFlow("")
     val searchQuery: StateFlow<String> = _searchQuery.asStateFlow()
 
+    private val _selectedCategory = MutableStateFlow<String?>("All")
+    val selectedCategory: StateFlow<String?> = _selectedCategory.asStateFlow()
+
     private val _snackbarEvent = MutableSharedFlow<String>()
     val snackbarEvent: SharedFlow<String> = _snackbarEvent.asSharedFlow()
 
-    val filteredProducts: StateFlow<List<Product>> = combine(allProducts, _searchQuery) { list, query ->
-        if (query.isBlank()) {
-            list
-        } else {
-            list.filter {
-                it.name.contains(query, ignoreCase = true) ||
-                it.description.contains(query, ignoreCase = true) ||
-                it.shape.contains(query, ignoreCase = true)
+    val filteredProducts: StateFlow<List<Product>> = combine(
+        allProducts,
+        _searchQuery,
+        _selectedCategory
+    ) { list, query, category ->
+        var result = list
+
+        if (!category.isNullOrBlank() && category != "All") {
+            result = result.filter { it.category.equals(category, ignoreCase = true) }
+        }
+
+        if (query.isNotBlank()) {
+            val q = query.trim()
+            result = result.filter {
+                it.name.contains(q, ignoreCase = true) ||
+                it.size.contains(q, ignoreCase = true) ||
+                it.category.contains(q, ignoreCase = true) ||
+                it.description.contains(q, ignoreCase = true)
             }
         }
+
+        result
     }.stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5000),
@@ -54,18 +71,26 @@ class CatalogViewModel(application: Application) : AndroidViewModel(application)
         _searchQuery.value = newQuery
     }
 
+    fun onCategorySelected(category: String?) {
+        _selectedCategory.value = category ?: "All"
+    }
+
     fun addProduct(
         name: String,
+        category: String,
+        size: String,
         price: Double,
         description: String,
-        shape: String,
-        colorHex: String,
+        shape: String = "Piece",
+        colorHex: String = "#3B1E15",
         referenceImageUri: String? = null,
         onSuccess: () -> Unit
     ) {
         viewModelScope.launch {
             val result = repository.addProduct(
                 name = name,
+                category = category,
+                size = size,
                 price = price,
                 description = description,
                 shape = shape,
@@ -73,7 +98,8 @@ class CatalogViewModel(application: Application) : AndroidViewModel(application)
                 referenceImageUri = referenceImageUri
             )
             result.onSuccess {
-                _snackbarEvent.emit("Added \"$name\" to catalog")
+                val label = if (size.isNotBlank()) "$name ($size)" else name
+                _snackbarEvent.emit("Added \"$label\" to catalog")
                 onSuccess()
             }.onFailure { err ->
                 _snackbarEvent.emit(err.message ?: "Failed to add product")
@@ -85,7 +111,8 @@ class CatalogViewModel(application: Application) : AndroidViewModel(application)
         viewModelScope.launch {
             val result = repository.updateProduct(product)
             result.onSuccess {
-                _snackbarEvent.emit("Updated \"${product.name}\"")
+                val label = if (product.size.isNotBlank()) "${product.name} (${product.size})" else product.name
+                _snackbarEvent.emit("Updated \"$label\"")
                 onSuccess()
             }.onFailure { err ->
                 _snackbarEvent.emit(err.message ?: "Failed to update product")
@@ -109,7 +136,7 @@ class CatalogViewModel(application: Application) : AndroidViewModel(application)
         viewModelScope.launch {
             val result = repository.updateImage(productId, imageUri)
             result.onSuccess {
-                _snackbarEvent.emit("Chocolate picture updated")
+                _snackbarEvent.emit("Product picture updated")
                 onSuccess()
             }.onFailure { err ->
                 _snackbarEvent.emit(err.message ?: "Failed to update image")
@@ -120,14 +147,14 @@ class CatalogViewModel(application: Application) : AndroidViewModel(application)
     fun deleteProduct(product: Product) {
         viewModelScope.launch {
             repository.deleteProduct(product)
-            _snackbarEvent.emit("Deleted \"${product.name}\" from catalog")
+            _snackbarEvent.emit("Deleted \"${product.displayTitle}\" from catalog")
         }
     }
 
     fun resetToDefaults() {
         viewModelScope.launch {
             repository.resetToDefaults()
-            _snackbarEvent.emit("Reset catalog to Revello signature menu")
+            _snackbarEvent.emit("Reset catalog to signature shop menu")
         }
     }
 }

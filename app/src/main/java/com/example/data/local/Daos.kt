@@ -12,11 +12,17 @@ import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface ProductDao {
-    @Query("SELECT * FROM products ORDER BY name ASC")
+    @Query("SELECT * FROM products ORDER BY category ASC, name ASC, size ASC")
     fun getAllProducts(): Flow<List<Product>>
 
-    @Query("SELECT * FROM products ORDER BY name ASC")
+    @Query("SELECT * FROM products ORDER BY category ASC, name ASC, size ASC")
     suspend fun getProductList(): List<Product>
+
+    @Query("SELECT * FROM products WHERE category = :category ORDER BY name ASC, size ASC")
+    fun getProductsByCategory(category: String): Flow<List<Product>>
+
+    @Query("SELECT * FROM products WHERE LOWER(name) = LOWER(:name) AND LOWER(size) = LOWER(:size) LIMIT 1")
+    suspend fun getProductByNameAndSize(name: String, size: String): Product?
 
     @Query("SELECT * FROM products WHERE LOWER(name) = LOWER(:name) LIMIT 1")
     suspend fun getProductByName(name: String): Product?

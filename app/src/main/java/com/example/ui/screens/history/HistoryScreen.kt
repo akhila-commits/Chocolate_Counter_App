@@ -81,7 +81,7 @@ import com.example.ui.theme.GoldPrimary
 import com.example.ui.theme.PlayfairFontFamily
 import com.example.ui.theme.RubyBerryColor
 import com.example.ui.viewmodel.HistoryViewModel
-import com.example.ui.viewmodel.formatLKR
+import com.example.ui.components.formatLKR
 import kotlinx.coroutines.flow.collectLatest
 import java.io.File
 import java.text.SimpleDateFormat
@@ -289,7 +289,7 @@ fun HistoryScreen(
                                 ChocolateShapeBadge(shape = item.shape, colorHex = item.colorHex, size = 32.dp)
                                 Spacer(modifier = Modifier.width(10.dp))
                                 Column(modifier = Modifier.weight(1f)) {
-                                    Text(item.productName, color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Medium)
+                                    Text(item.displayName, color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Medium)
                                     Text("${item.count} × ${formatLKR(item.unitPrice)}", color = Color(0xFFD7CCC8), fontSize = 12.sp)
                                 }
                                 Text(
