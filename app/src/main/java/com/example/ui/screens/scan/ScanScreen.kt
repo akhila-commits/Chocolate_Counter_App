@@ -334,6 +334,17 @@ fun ScanScreen(
             tenderAmount = tenderAmount,
             changeDue = viewModel.changeDue,
             notes = notes,
+            onCloseAndSave = {
+                if (scanItems.any { it.count > 0 }) {
+                    viewModel.saveCurrentScan {
+                        showReceiptDialog = false
+                        showOrderCalculatorDialog = false
+                    }
+                } else {
+                    showReceiptDialog = false
+                    showOrderCalculatorDialog = false
+                }
+            },
             onDismiss = { showReceiptDialog = false }
         )
     }

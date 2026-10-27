@@ -535,7 +535,8 @@ fun OrderReceiptDialog(
     tenderAmount: Double?,
     changeDue: Double,
     notes: String,
-    onDismiss: () -> Unit
+    onCloseAndSave: () -> Unit,
+    onDismiss: () -> Unit = {}
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -623,10 +624,20 @@ fun OrderReceiptDialog(
         },
         confirmButton = {
             Button(
-                onClick = onDismiss,
-                colors = ButtonDefaults.buttonColors(containerColor = GoldPrimary, contentColor = CacaoBlack)
+                onClick = onCloseAndSave,
+                colors = ButtonDefaults.buttonColors(containerColor = GoldPrimary, contentColor = CacaoBlack),
+                shape = RoundedCornerShape(8.dp),
+                modifier = Modifier.testTag("receipt_close_save_button")
             ) {
-                Text("Close")
+                Text("Close", fontWeight = FontWeight.Bold)
+            }
+        },
+        dismissButton = {
+            TextButton(
+                onClick = onDismiss,
+                colors = ButtonDefaults.textButtonColors(contentColor = Color(0xFFD7CCC8))
+            ) {
+                Text("Back to Edit")
             }
         }
     )
