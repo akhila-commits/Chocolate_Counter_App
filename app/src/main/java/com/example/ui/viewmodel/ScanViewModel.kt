@@ -164,6 +164,36 @@ class ScanViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    fun startManualTally() {
+        viewModelScope.launch {
+            val catalog = productRepository.getProductList()
+            if (catalog.isEmpty()) {
+                _uiState.value = ScanUiState.Error("Product catalog is empty. Please add products first.")
+                return@launch
+            }
+
+            val current = _scanItems.value.toMutableList()
+            if (current.isEmpty()) {
+                // Initialize catalog products ready for counting
+                val initialItems = catalog.map { product ->
+                    ScanItem(
+                        productName = product.name,
+                        unitPrice = product.price,
+                        count = 0,
+                        confidence = 1.0,
+                        shape = product.shape,
+                        colorHex = product.colorHex
+                    )
+                }
+                _scanItems.value = initialItems
+            }
+            _unrecognizedCount.value = 0
+            _notes.value = "Fast Counter Tally for Order #${_orderNumber.value}"
+            val summary = generateSummaryText()
+            _uiState.value = ScanUiState.ResultReady(summary)
+        }
+    }
+
     fun runSimulatedRecognition() {
         viewModelScope.launch {
             _uiState.value = ScanUiState.Analyzing("Simulating tray counter...")
@@ -215,13 +245,11 @@ class ScanViewModel(application: Application) : AndroidViewModel(application) {
         val index = current.indexOfFirst { it.productName == productName }
         if (index != -1) {
             val old = current[index]
-            if (old.count > 1) {
+            if (old.count > 0) {
                 current[index] = old.copy(count = old.count - 1)
-            } else {
-                current.removeAt(index)
+                _scanItems.value = current
+                updateSummaryState()
             }
-            _scanItems.value = current
-            updateSummaryState()
         }
     }
 
@@ -316,7 +344,13 @@ class ScanViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun saveCurrentScan(onSuccess: () -> Unit) {
-        if (_scanItems.value.isEmpty()) return
+        val itemsToSave = _scanItems.value.filter { it.count > 0 }
+        if (itemsToSave.isEmpty()) {
+            viewModelScope.launch {
+                _toastEvent.emit("Please add at least 1 chocolate piece before saving Order #${_orderNumber.value}")
+            }
+            return
+        }
         viewModelScope.launch {
             try {
                 val bitmap = _selectedBitmap.value
@@ -325,7 +359,7 @@ class ScanViewModel(application: Application) : AndroidViewModel(application) {
                 }
 
                 val currentOrderNum = _orderNumber.value
-                val jsonString = scanItemAdapter.toJson(_scanItems.value)
+                val jsonString = scanItemAdapter.toJson(itemsToSave)
                 val summary = generateSummaryText()
                 val record = ScanRecord(
                     orderNumber = currentOrderNum,

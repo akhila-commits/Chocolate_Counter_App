@@ -56,6 +56,7 @@ import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material.icons.filled.Receipt
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Remove
+import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -260,6 +261,7 @@ fun ScanScreen(
         onNewOrderNumberClick = { viewModel.generateNewOrderNumber() },
         onToggleGrid = { viewModel.toggleGridOverlay() },
         onCountChocolatesClick = { viewModel.startRecognition() },
+        onManualTallyClick = { viewModel.startManualTally() },
         onSimulateClick = { viewModel.runSimulatedRecognition() },
         onRetakeClick = { viewModel.resetScan() },
         onIncrement = { viewModel.incrementCount(it) },
@@ -625,6 +627,7 @@ private fun ScaffoldScanContent(
     onNewOrderNumberClick: () -> Unit,
     onToggleGrid: () -> Unit,
     onCountChocolatesClick: () -> Unit,
+    onManualTallyClick: () -> Unit,
     onSimulateClick: () -> Unit,
     onRetakeClick: () -> Unit,
     onIncrement: (String) -> Unit,
@@ -699,7 +702,8 @@ private fun ScaffoldScanContent(
             item {
                 CaptureOptionsCard(
                     onCameraClick = onCameraClick,
-                    onUploadClick = onUploadClick
+                    onUploadClick = onUploadClick,
+                    onDirectManualTallyClick = onManualTallyClick
                 )
             }
 
@@ -708,7 +712,7 @@ private fun ScaffoldScanContent(
                 SampleTraySelectorSection(onSelect = onSampleTraySelect)
             }
         } else {
-            // Preview card with enhanced grid framing overlay
+            // Preview card with dual AI & Fast Manual tally options
             item {
                 TrayPreviewCard(
                     bitmap = selectedBitmap,
@@ -719,6 +723,7 @@ private fun ScaffoldScanContent(
                     isAnalyzing = uiState is ScanUiState.Analyzing,
                     isResultReady = uiState is ScanUiState.ResultReady,
                     onCountClick = onCountChocolatesClick,
+                    onManualTallyClick = onManualTallyClick,
                     onRetakeClick = onRetakeClick
                 )
             }
@@ -727,12 +732,17 @@ private fun ScaffoldScanContent(
         // Loading State during Gemini API call
         if (uiState is ScanUiState.Analyzing) {
             item {
-                AnalyzingProgressCard(statusMessage = (uiState as ScanUiState.Analyzing).statusMessage)
+                AnalyzingProgressCard(
+                    statusMessage = (uiState as ScanUiState.Analyzing).statusMessage,
+                    onCancelOrManualTally = onManualTallyClick
+                )
             }
         }
 
-        // Error State
+        // Error State (e.g. 503 high demand or network timeout)
         if (uiState is ScanUiState.Error) {
+            val errorMsg = (uiState as ScanUiState.Error).message
+            val isHighDemand503 = errorMsg.contains("503") || errorMsg.contains("high demand", ignoreCase = true)
             item {
                 Card(
                     modifier = Modifier
@@ -741,47 +751,88 @@ private fun ScaffoldScanContent(
                         .testTag("scan_error_card"),
                     colors = CardDefaults.cardColors(containerColor = Color(0xFF381414)),
                     shape = RoundedCornerShape(12.dp),
-                    border = BorderStroke(1.dp, RubyBerryColor.copy(alpha = 0.5f))
+                    border = BorderStroke(1.dp, RubyBerryColor.copy(alpha = 0.6f))
                 ) {
                     Column(modifier = Modifier.padding(16.dp)) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.Default.Warning, contentDescription = null, tint = RubyBerryColor)
+                        Row(verticalAlignment = Alignment.Top) {
+                            Icon(
+                                Icons.Default.Warning,
+                                contentDescription = null,
+                                tint = RubyBerryColor,
+                                modifier = Modifier.size(24.dp)
+                            )
                             Spacer(modifier = Modifier.width(12.dp))
                             Column(modifier = Modifier.weight(1f)) {
-                                Text("Recognition Notice", fontWeight = FontWeight.Bold, color = Color.White)
-                                Text((uiState as ScanUiState.Error).message, color = Color(0xFFFFCDD2), fontSize = 13.sp)
+                                Text(
+                                    text = if (isHighDemand503) "Google AI Server High Demand (503)" else "Recognition Notice",
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color.White,
+                                    fontSize = 15.sp
+                                )
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text(
+                                    text = if (isHighDemand503) {
+                                        "Google's Gemini vision cloud is currently handling peak traffic (503). You don't have to wait for the servers — switch to Fast Manual Tally to count and finalize Order #$orderNumber right now!"
+                                    } else {
+                                        errorMsg
+                                    },
+                                    color = Color(0xFFFFCDD2),
+                                    fontSize = 13.sp,
+                                    lineHeight = 17.sp
+                                )
                             }
                         }
                         Spacer(modifier = Modifier.height(14.dp))
+
+                        // Fast manual tally button as prominent primary action
+                        Button(
+                            onClick = onManualTallyClick,
+                            colors = ButtonDefaults.buttonColors(containerColor = GoldPrimary, contentColor = CacaoBlack),
+                            shape = RoundedCornerShape(8.dp),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(46.dp)
+                                .testTag("error_manual_tally_button")
+                        ) {
+                            Icon(Icons.Default.Receipt, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("⚡ Switch to Fast Manual Tally ($orderNumber)", fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                        }
+
+                        Spacer(modifier = Modifier.height(8.dp))
+
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.spacedBy(10.dp)
                         ) {
-                            Button(
-                                onClick = onCountChocolatesClick,
-                                colors = ButtonDefaults.buttonColors(containerColor = GoldPrimary, contentColor = CacaoBlack),
-                                shape = RoundedCornerShape(8.dp),
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .height(44.dp)
-                                    .testTag("retry_ai_button")
-                            ) {
-                                Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(16.dp))
-                                Spacer(modifier = Modifier.width(6.dp))
-                                Text("Retry with AI", fontWeight = FontWeight.Bold, fontSize = 13.sp)
-                            }
-
                             OutlinedButton(
-                                onClick = onSimulateClick,
+                                onClick = onCountChocolatesClick,
                                 colors = ButtonDefaults.outlinedButtonColors(contentColor = GoldLight),
                                 border = BorderStroke(1.dp, GoldPrimary),
                                 shape = RoundedCornerShape(8.dp),
                                 modifier = Modifier
                                     .weight(1f)
-                                    .height(44.dp)
+                                    .height(42.dp)
+                                    .testTag("retry_ai_button")
+                            ) {
+                                Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(15.dp))
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text("Retry Cloud AI", fontWeight = FontWeight.SemiBold, fontSize = 12.sp)
+                            }
+
+                            OutlinedButton(
+                                onClick = onSimulateClick,
+                                colors = ButtonDefaults.outlinedButtonColors(contentColor = AmberCaramel),
+                                border = BorderStroke(1.dp, AmberCaramel),
+                                shape = RoundedCornerShape(8.dp),
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .height(42.dp)
                                     .testTag("use_simulator_button")
                             ) {
-                                Text("Use Counter Sim", fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+                                Icon(Icons.Default.Star, contentDescription = null, modifier = Modifier.size(15.dp))
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text("Smart Estimator", fontWeight = FontWeight.SemiBold, fontSize = 12.sp)
                             }
                         }
                     }
@@ -991,7 +1042,8 @@ private fun OrderNumberBar(
 @Composable
 private fun CaptureOptionsCard(
     onCameraClick: () -> Unit,
-    onUploadClick: () -> Unit
+    onUploadClick: () -> Unit,
+    onDirectManualTallyClick: () -> Unit
 ) {
     Card(
         modifier = Modifier
@@ -1088,6 +1140,25 @@ private fun CaptureOptionsCard(
                     Spacer(modifier = Modifier.width(6.dp))
                     Text("Upload", fontWeight = FontWeight.SemiBold)
                 }
+            }
+
+            Spacer(modifier = Modifier.height(10.dp))
+
+            OutlinedButton(
+                onClick = onDirectManualTallyClick,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(46.dp)
+                    .testTag("direct_manual_tally_button"),
+                colors = ButtonDefaults.outlinedButtonColors(
+                    contentColor = AmberCaramel
+                ),
+                border = BorderStroke(1.dp, AmberCaramel.copy(alpha = 0.8f)),
+                shape = RoundedCornerShape(12.dp)
+            ) {
+                Icon(Icons.Default.Receipt, contentDescription = null, tint = AmberCaramel, modifier = Modifier.size(18.dp))
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("⚡ Fast Manual Counter (No Photo Required)", fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
             }
         }
     }
@@ -1192,6 +1263,7 @@ private fun TrayPreviewCard(
     isAnalyzing: Boolean,
     isResultReady: Boolean,
     onCountClick: () -> Unit,
+    onManualTallyClick: () -> Unit,
     onRetakeClick: () -> Unit
 ) {
     Card(
@@ -1301,23 +1373,46 @@ private fun TrayPreviewCard(
 
             if (!isResultReady && !isAnalyzing) {
                 Spacer(modifier = Modifier.height(14.dp))
-                Button(
-                    onClick = onCountClick,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(52.dp)
-                        .testTag("count_chocolates_button"),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = GoldPrimary,
-                        contentColor = CacaoBlack
-                    ),
-                    shape = RoundedCornerShape(12.dp)
-                ) {
-                    Text(
-                        text = "Identify & Count ($orderNumber)",
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 16.sp
-                    )
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Button(
+                        onClick = onCountClick,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(50.dp)
+                            .testTag("count_chocolates_button"),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = GoldPrimary,
+                            contentColor = CacaoBlack
+                        ),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Icon(Icons.Default.Star, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "Auto-Count with AI ($orderNumber)",
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 15.sp
+                        )
+                    }
+
+                    OutlinedButton(
+                        onClick = onManualTallyClick,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(48.dp)
+                            .testTag("fast_manual_tally_button"),
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = GoldLight),
+                        border = BorderStroke(1.5.dp, Brush.horizontalGradient(listOf(AmberCaramel, GoldPrimary))),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Icon(Icons.Default.Receipt, contentDescription = null, tint = AmberCaramel, modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "⚡ Fast Manual Tally ($orderNumber)",
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 15.sp
+                        )
+                    }
                 }
             }
         }
@@ -1325,7 +1420,10 @@ private fun TrayPreviewCard(
 }
 
 @Composable
-private fun AnalyzingProgressCard(statusMessage: String) {
+private fun AnalyzingProgressCard(
+    statusMessage: String,
+    onCancelOrManualTally: () -> Unit
+) {
     val infiniteTransition = rememberInfiniteTransition(label = "pulse")
     val scale by infiniteTransition.animateFloat(
         initialValue = 0.95f,
@@ -1379,6 +1477,18 @@ private fun AnalyzingProgressCard(statusMessage: String) {
                 color = Color(0xFFD7CCC8),
                 textAlign = TextAlign.Center
             )
+            Spacer(modifier = Modifier.height(14.dp))
+            OutlinedButton(
+                onClick = onCancelOrManualTally,
+                colors = ButtonDefaults.outlinedButtonColors(contentColor = AmberCaramel),
+                border = BorderStroke(1.dp, AmberCaramel.copy(alpha = 0.7f)),
+                shape = RoundedCornerShape(8.dp),
+                modifier = Modifier.height(38.dp)
+            ) {
+                Icon(Icons.Default.Receipt, contentDescription = null, tint = AmberCaramel, modifier = Modifier.size(15.dp))
+                Spacer(modifier = Modifier.width(6.dp))
+                Text("Switch to Fast Manual Tally", fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+            }
         }
     }
 }
@@ -1448,9 +1558,12 @@ private fun ScanItemRow(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 16.dp, vertical = 4.dp),
-        colors = CardDefaults.cardColors(containerColor = CacaoDark),
+        colors = CardDefaults.cardColors(containerColor = if (item.count > 0) CacaoDark else CacaoDark.copy(alpha = 0.6f)),
         shape = RoundedCornerShape(12.dp),
-        border = BorderStroke(1.dp, Brush.horizontalGradient(listOf(CacaoBorder, CacaoCard)))
+        border = BorderStroke(
+            1.dp,
+            if (item.count > 0) Brush.horizontalGradient(listOf(CacaoBorder, CacaoCard)) else Brush.horizontalGradient(listOf(CacaoBorder.copy(alpha = 0.4f), CacaoBorder.copy(alpha = 0.2f)))
+        )
     ) {
         Row(
             modifier = Modifier
@@ -1470,7 +1583,7 @@ private fun ScanItemRow(
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = item.productName,
-                    color = Color.White,
+                    color = if (item.count > 0) Color.White else Color.White.copy(alpha = 0.6f),
                     fontWeight = FontWeight.SemiBold,
                     fontSize = 15.sp
                 )
@@ -1491,14 +1604,15 @@ private fun ScanItemRow(
             ) {
                 IconButton(
                     onClick = onDecrement,
+                    enabled = item.count > 0,
                     modifier = Modifier
                         .size(44.dp)
                         .testTag("decrement_${item.productName}")
                 ) {
                     Icon(
-                        imageVector = if (item.count > 1) Icons.Default.Remove else Icons.Default.DeleteOutline,
+                        imageVector = if (item.count > 1) Icons.Default.Remove else if (item.count == 1) Icons.Default.DeleteOutline else Icons.Default.Remove,
                         contentDescription = "Decrease count",
-                        tint = if (item.count > 1) GoldLight else RubyBerryColor,
+                        tint = if (item.count > 1) GoldLight else if (item.count == 1) RubyBerryColor else Color.Gray,
                         modifier = Modifier.size(18.dp)
                     )
                 }
@@ -1506,7 +1620,7 @@ private fun ScanItemRow(
                 // Tap count to enter number directly
                 Text(
                     text = "${item.count}",
-                    color = GoldLight,
+                    color = if (item.count > 0) GoldLight else Color.Gray,
                     fontWeight = FontWeight.Bold,
                     fontSize = 16.sp,
                     modifier = Modifier
@@ -1536,7 +1650,7 @@ private fun ScanItemRow(
             Column(horizontalAlignment = Alignment.End) {
                 Text(
                     text = formatLKR(item.lineTotal),
-                    color = GoldLight,
+                    color = if (item.count > 0) GoldLight else Color.Gray,
                     fontWeight = FontWeight.Bold,
                     fontSize = 14.sp
                 )

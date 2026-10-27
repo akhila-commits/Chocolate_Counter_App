@@ -27,11 +27,12 @@ class GeminiVisionService {
 
     companion object {
         private const val TAG = "GeminiVisionService"
-        // Candidate Gemini models: gemini-3.8-flash is the latest recommended model
+        // Production Gemini models in fallback order
         private val CANDIDATE_MODELS = listOf(
-            "gemini-3.8-flash",
             "gemini-2.0-flash",
-            "gemini-1.5-flash"
+            "gemini-1.5-flash",
+            "gemini-1.5-pro",
+            "gemini-2.0-flash-lite-preview-02-05"
         )
     }
 
@@ -74,7 +75,8 @@ class GeminiVisionService {
                 2. Never invent a product name not in the catalog; match each item to the closest catalog product.
                 3. Count partially visible or overlapping pieces as best as you can rather than skipping them.
                 4. If you see pieces that truly do not match any item in the catalog, report their count in 'unrecognizedCount'.
-                5. Return ONLY a valid JSON object matching this schema:
+                5. If the photo does not contain any chocolates or catalog items (e.g., test photo of a computer mouse, roll-on bottle, desk, empty surface), return an empty items list [], unrecognizedCount = 0, and notes: "No Revello chocolates detected in this photo."
+                6. Return ONLY a valid JSON object matching this schema:
                 {
                   "items": [
                     { "productName": "Exact Catalog Name", "count": 4, "confidence": 0.95 }
@@ -115,39 +117,59 @@ class GeminiVisionService {
 
             var lastFailure: Exception? = null
 
-            // Iterate through candidate models starting with gemini-3.8-flash
+            // Iterate through candidate models with retry & fallback cascade
             for (model in CANDIDATE_MODELS) {
-                try {
-                    val url = "https://generativelanguage.googleapis.com/v1beta/models/$model:generateContent?key=$apiKey"
-                    val request = Request.Builder()
-                        .url(url)
-                        .post(requestBody)
-                        .build()
+                // Try up to 2 attempts per model for transient errors
+                for (attempt in 1..2) {
+                    try {
+                        val url = "https://generativelanguage.googleapis.com/v1beta/models/$model:generateContent?key=$apiKey"
+                        val request = Request.Builder()
+                            .url(url)
+                            .post(requestBody)
+                            .build()
 
-                    val response = client.newCall(request).execute()
-                    val responseBody = response.body?.string().orEmpty()
+                        val response = client.newCall(request).execute()
+                        val responseBody = response.body?.string().orEmpty()
 
-                    if (response.isSuccessful) {
-                        Log.i(TAG, "Successfully recognized tray using $model")
-                        val parsedResult = parseGeminiResponse(responseBody, catalog)
-                        return@withContext Result.success(parsedResult)
+                        if (response.isSuccessful) {
+                            Log.i(TAG, "Successfully recognized tray using $model on attempt $attempt")
+                            val parsedResult = parseGeminiResponse(responseBody, catalog)
+                            return@withContext Result.success(parsedResult)
+                        }
+
+                        val parsedMsg = parseErrorMessage(responseBody)
+                        Log.w(TAG, "Model $model attempt $attempt returned error ${response.code}: $parsedMsg")
+                        lastFailure = Exception("Gemini API error (${response.code}): $parsedMsg")
+
+                        // For 503 (High demand) or 429 (Rate limit) or 500, back off briefly then retry or cascade
+                        if (response.code == 503 || response.code == 429 || response.code == 500 || response.code == 502) {
+                            if (attempt == 1) {
+                                kotlinx.coroutines.delay(800) // Brief backoff before retry
+                                continue
+                            }
+                            // Attempt 2 failed on this model, proceed to next candidate model
+                            break
+                        } else {
+                            // 404, 400, or invalid model: immediately proceed to next candidate model
+                            break
+                        }
+                    } catch (e: Exception) {
+                        Log.w(TAG, "Request exception with $model attempt $attempt: ${e.message}")
+                        lastFailure = e
+                        if (attempt == 1) {
+                            kotlinx.coroutines.delay(600)
+                            continue
+                        }
+                        break
                     }
-
-                    val parsedMsg = parseErrorMessage(responseBody)
-                    Log.w(TAG, "Model $model returned error ${response.code}: $parsedMsg")
-                    lastFailure = Exception("Gemini API error (${response.code}) with $model: $parsedMsg")
-
-                    // Only continue trying next model if 404 (model not found/deprecated) or 400 (unsupported model)
-                    if (response.code != 404 && response.code != 400) {
-                        return@withContext Result.failure(Exception("Gemini API error (${response.code}): $parsedMsg"))
-                    }
-                } catch (e: Exception) {
-                    Log.w(TAG, "Request exception with $model: ${e.message}")
-                    lastFailure = e
                 }
             }
 
-            Result.failure(lastFailure ?: Exception("Recognition request failed across available models"))
+            Result.failure(
+                lastFailure ?: Exception(
+                    "Gemini cloud is currently experiencing high demand (503). You can switch to Fast Manual Tally to count and finalize this order immediately!"
+                )
+            )
         } catch (e: Exception) {
             Log.e(TAG, "Recognition failed", e)
             Result.failure(e)
